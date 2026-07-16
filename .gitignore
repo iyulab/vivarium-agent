@@ -1,0 +1,16 @@
+# Working/agent documents stay out of the public repo (governance policy)
+CLAUDE.md
+claudedocs/
+.claude/
+
+# Editor/OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+node_modules/
+dist/
+bin/
+obj/
