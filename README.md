@@ -2,7 +2,7 @@
 
 > Agent harness that turns natural-language intent and on-screen selection into verified changesets, with pluggable domain knowledge.
 
-**Status: design phase (pre-0.1).** This document fixes the harness's purpose, boundaries, and the contract it lives by. Model choices, prompting strategy, and retrieval design are intentionally left open.
+**Status: harness core implemented (pre-0.1).** This document fixes the harness's purpose, boundaries, and the contract it lives by. The core — pluggable provider/knowledge/strategy ports, the plan-then-generate default strategy with a spec-validate retry loop, and provenance recording — is implemented and tested; model choices and retrieval design remain open.
 
 ---
 
@@ -37,12 +37,19 @@ Vivarium Agent is the harness that supplies all three: it consumes **edit contex
 4. **Knowledge is pluggable and inspectable.** The harness must be able to say what knowledge sources informed a proposal. Swapping domains (a manufacturing platform vs. a note-taking tool) must not require changing harness code.
 5. **The model is replaceable.** No fixed principle may depend on the behavior of a specific LLM.
 
+## Decided in v0
+
+- Host shape: a TypeScript library first; a sidecar can wrap the same core
+  when demand for one materializes. The harness never owns credentials —
+  model calls go through an injected provider port.
+- Default strategy: plan-then-generate with a bounded validate-retry loop
+  (the validator is the changeset SDK — deterministic, not a model).
+  Strategies are swappable modules; this is a default, not a commitment.
+
 ## Deliberately undecided
 
 - Model provider(s), routing, and local-vs-hosted strategy
 - Retrieval design (RAG shape, indexing, how catalogs and conventions are encoded)
-- Prompting and planning strategy (single-shot, plan-then-generate, self-review loops)
-- Host process shape (library, sidecar service, or both)
 - How multi-changeset sessions compose (stacking proposals vs. rebasing)
 
 ## Relationship to the Vivarium family
