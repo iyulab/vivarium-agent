@@ -14,7 +14,7 @@
 2. **Grounding in what the platform allows.** An agent that doesn't know the runtime's primitive surface, the data model's shape, or the house rules for deriving entities will generate plausible nonsense.
 3. **An output that can be reviewed before it acts.** Free-form code or ad-hoc API calls cannot be gated; a fingerprinted changeset can.
 
-Vivarium Agent is the harness that supplies all three: it consumes **edit context** (from a runtime such as [Vivarium](../vivarium)) plus natural language, retrieves the relevant platform knowledge, and emits a **changeset** ([`vivarium-changeset`](../vivarium-changeset)) — never a direct mutation.
+Vivarium Agent is the harness that supplies all three: it consumes **edit context** (from a runtime such as [Vivarium](https://github.com/iyulab/vivarium)) plus natural language, retrieves the relevant platform knowledge, and emits a **changeset** ([`vivarium-changeset`](https://github.com/iyulab/vivarium-changeset)) — never a direct mutation.
 
 ## What this repository contains
 
@@ -24,7 +24,7 @@ Vivarium Agent is the harness that supplies all three: it consumes **edit contex
 
 ## What this repository is not
 
-- **Not an applier.** The agent's output stops at a validated, fingerprinted changeset. It holds no credentials to any database or runtime and cannot make anything happen by itself. Apply belongs to [`vivarium-stage`](../vivarium-stage) or an equivalent consumer.
+- **Not an applier.** The agent's output stops at a validated, fingerprinted changeset. It holds no credentials to any database or runtime and cannot make anything happen by itself. Apply belongs to [`vivarium-stage`](https://github.com/iyulab/vivarium-stage) or an equivalent consumer.
 - **Not a model.** The harness is model-agnostic. Which LLM, local or hosted, one call or many — provider concerns behind an interface.
 - **Not a chatbot framework.** Conversation exists here only in service of producing changes. General-purpose assistant features are out of scope.
 - **Not the knowledge itself.** Primitive catalogs, schema conventions, and methodology rules ship with the platforms that own them. This repo defines the socket, not the plug.
@@ -47,7 +47,7 @@ Vivarium Agent is the harness that supplies all three: it consumes **edit contex
 
 ## Relationship to the Vivarium family
 
-Depends on [`vivarium-changeset`](../vivarium-changeset) (its output contract) and consumes the edit-context format published by [`vivarium`](../vivarium). It has no dependency on `vivarium-stage` — the agent doesn't know or care who applies its proposals.
+Depends on [`vivarium-changeset`](https://github.com/iyulab/vivarium-changeset) (its output contract) and consumes the edit-context format published by [`vivarium`](https://github.com/iyulab/vivarium). It has no dependency on `vivarium-stage` — the agent doesn't know or care who applies its proposals.
 
 Standalone use is a first-class scenario: any product wanting a *"conversational editor that proposes reviewable changes"* — regardless of what it edits — can host this harness with its own knowledge plug and its own applier.
 
