@@ -14,7 +14,12 @@
  */
 
 import type { ModelProvider, KnowledgeSource, EditContextInput } from "./ports.ts";
-import type { ProposalStrategy, StrategyOutcome, RetrievedKnowledge } from "./strategy.ts";
+import type {
+  ProposalStrategy,
+  StrategyOutcome,
+  RetrievedKnowledge,
+  PriorProposalContext,
+} from "./strategy.ts";
 import { createPlanThenGenerateStrategy } from "./strategies/plan-then-generate.ts";
 
 export interface AgentHarnessOptions {
@@ -32,6 +37,8 @@ export interface ProposeRequest {
   editContext?: EditContextInput | null;
   /** Current artifact contents by id — base state for ui patches. */
   artifacts?: Record<string, string>;
+  /** Present when this proposal refines a prior one (proposal loop). */
+  prior?: PriorProposalContext | null;
 }
 
 export interface Proposal {
@@ -44,6 +51,8 @@ export interface Proposal {
     provider: string;
     knowledgeSources: string[];
     attempts: number;
+    /** Fingerprint of the proposal this one refines, when in a session. */
+    refinedFrom: string | null;
   };
 }
 
@@ -93,6 +102,7 @@ export function createAgentHarness(options: AgentHarnessOptions): AgentHarness {
         provider: options.provider,
         now: clock(),
         maxAttempts,
+        prior: request.prior ?? null,
       });
 
       if (outcome.status !== "validated") {
@@ -108,6 +118,7 @@ export function createAgentHarness(options: AgentHarnessOptions): AgentHarness {
             provider: options.provider.name,
             knowledgeSources: retrieved.map((k) => k.source),
             attempts: outcome.attempts,
+            refinedFrom: request.prior?.fingerprint ?? null,
           },
         },
         outcome,

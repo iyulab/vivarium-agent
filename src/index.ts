@@ -23,6 +23,15 @@ export type {
   ExhaustedOutcome,
   AttemptRecord,
   RetrievedKnowledge,
+  PriorProposalContext,
 } from "./strategy.ts";
+
+export { createProposalSession } from "./session.ts";
+export type {
+  ProposalSession,
+  ProposalSessionOptions,
+  SessionTurnRecord,
+  RefineOverrides,
+} from "./session.ts";
 
 export { createPlanThenGenerateStrategy, fenceUntrusted } from "./strategies/plan-then-generate.ts";

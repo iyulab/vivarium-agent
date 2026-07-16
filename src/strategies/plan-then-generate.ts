@@ -77,6 +77,18 @@ function buildPlanPrompt(input: StrategyInput): { system: string; user: string }
   for (const k of input.knowledge) {
     sections.push(`KNOWLEDGE [${k.source}]:\n${k.items.join("\n")}`);
   }
+  if (input.prior) {
+    // Prior plan/explanations are model-derived (transitively untrusted) — fenced.
+    const summary = [
+      `plan:\n${input.prior.plan}`,
+      `applied changes:\n${input.prior.explanations.map((e) => `- ${e}`).join("\n")}`,
+    ].join("\n");
+    sections.push(
+      `PRIOR PROPOSAL (turn ${input.prior.turn}, ${input.prior.fingerprint}) — ` +
+        `the INTENT above refines it; its changes are already part of the base artifacts:\n` +
+        fenceUntrusted("prior proposal summary", summary),
+    );
+  }
   return {
     system:
       "You are an editing planner. Produce a short, numbered plan describing which elements change and how. " +
@@ -119,11 +131,18 @@ export function createPlanThenGenerateStrategy(): ProposalStrategy {
             intent: input.intent,
             producedBy: `vivarium-agent/${this.name} provider:${input.provider.name}`,
             createdAt: input.now,
-            baseState: Object.entries(input.artifacts).map(([id, content]) => ({
-              kind: "ui-artifact",
-              ref: id,
-              fingerprint: artifactFingerprint(content),
-            })),
+            baseState: [
+              ...Object.entries(input.artifacts).map(([id, content]) => ({
+                kind: "ui-artifact",
+                ref: id,
+                fingerprint: artifactFingerprint(content),
+              })),
+              // Refinement lineage: the world authored against includes the
+              // prior (not-yet-released) changeset (spec §4 baseState).
+              ...(input.prior
+                ? [{ kind: "changeset", ref: input.prior.ref, fingerprint: input.prior.fingerprint }]
+                : []),
+            ],
             ...(input.editContext ? { editContext: input.editContext } : {}),
           });
           for (const patch of payload.uiPatches ?? []) {

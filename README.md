@@ -2,7 +2,7 @@
 
 > Agent harness that turns natural-language intent and on-screen selection into verified changesets, with pluggable domain knowledge.
 
-**Status: harness core implemented (pre-0.1).** This document fixes the harness's purpose, boundaries, and the contract it lives by. The core — pluggable provider/knowledge/strategy ports, the plan-then-generate default strategy with a spec-validate retry loop, and provenance recording — is implemented and tested; model choices and retrieval design remain open.
+**Status: harness core + proposal loop implemented (pre-0.1).** This document fixes the harness's purpose, boundaries, and the contract it lives by. The core — pluggable provider/knowledge/strategy ports, the plan-then-generate default strategy with a spec-validate retry loop, provenance recording, and the multi-turn proposal session (refinements chain on the prior proposal, with lineage recorded in provenance) — is implemented and tested; model choices and retrieval design remain open.
 
 ---
 
@@ -45,12 +45,18 @@ Vivarium Agent is the harness that supplies all three: it consumes **edit contex
 - Default strategy: plan-then-generate with a bounded validate-retry loop
   (the validator is the changeset SDK — deterministic, not a model).
   Strategies are swappable modules; this is a default, not a commitment.
+- Session composition: a refinement is authored against the world *plus* the
+  prior validated proposal (its projection becomes the base artifacts), and
+  that lineage is machine-readable in the changeset's `provenance.baseState`
+  (`{ kind: "changeset", ref, fingerprint }`). An exhausted turn never
+  advances the shared state.
 
 ## Deliberately undecided
 
 - Model provider(s), routing, and local-vs-hosted strategy
 - Retrieval design (RAG shape, indexing, how catalogs and conventions are encoded)
-- How multi-changeset sessions compose (stacking proposals vs. rebasing)
+- Rebasing a session onto a world that moved underneath it (v0 refuses via
+  drift detection; a smarter strategy is future work)
 
 ## Relationship to the Vivarium family
 
