@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validate, verifyFingerprint, artifactFingerprint } from "@vivarium/changeset";
+import { validate, verifyFingerprint, artifactFingerprint } from "@vivariumjs/changeset";
 import { createProposalSession } from "./session.ts";
 import type { ModelRequest } from "./ports.ts";
 

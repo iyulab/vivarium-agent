@@ -18,7 +18,7 @@ import {
   finalize,
   artifactFingerprint,
   ChangesetValidationError,
-} from "@vivarium/changeset";
+} from "@vivariumjs/changeset";
 import type { ProposalStrategy, StrategyInput, StrategyOutcome, AttemptRecord } from "../strategy.ts";
 
 /**

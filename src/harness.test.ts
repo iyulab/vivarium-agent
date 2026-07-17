@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validate, verifyFingerprint } from "@vivarium/changeset";
+import { validate, verifyFingerprint } from "@vivariumjs/changeset";
 import { createAgentHarness } from "./harness.ts";
 import type { ModelRequest } from "./ports.ts";
 
