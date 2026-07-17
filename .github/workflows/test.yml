@@ -9,34 +9,21 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
-      # Pre-publish stopgap: @vivariumjs/changeset is a file: dependency on a
-      # sibling checkout (../vivarium-changeset). Once the SDK is published,
-      # replace this double checkout with a normal semver dependency.
       - uses: actions/checkout@v4
-        with:
-          path: vivarium-agent
-      - uses: actions/checkout@v4
-        with:
-          repository: iyulab/vivarium-changeset
-          path: vivarium-changeset
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      # The SDK's exports point at dist/ — sibling consumers build it once.
-      - name: Build sibling @vivariumjs/changeset dist
-        run: npm ci && npm run build
-        working-directory: vivarium-changeset/sdk/typescript
-      - run: npm install
-        working-directory: vivarium-agent
+      - run: npm ci
       - run: npm test
-        working-directory: vivarium-agent
+      # Type-check + dist build — exports point at dist/, so the consumer
+      # smoke below needs it built (folder installs don't run prepack).
+      - run: npm run build
       # Consumer-contact smoke (Phase 5.a): a fresh consumer package installs
-      # this repo and imports the public surface. Still sibling-dependent —
-      # true standalone consumption waits on the registry publish (the file:
-      # dependency issue tracked for Phase 5.b).
+      # this repo and imports the public surface. @vivariumjs/changeset comes
+      # from the registry, so this is a true standalone consumption check.
       - name: Fresh consumer installs and imports @vivariumjs/agent
         run: |
           mkdir "$RUNNER_TEMP/consumer" && cd "$RUNNER_TEMP/consumer"
           echo '{"name":"consumer","private":true,"type":"module"}' > package.json
-          npm install --no-audit --no-fund "$GITHUB_WORKSPACE/vivarium-agent"
+          npm install --no-audit --no-fund "$GITHUB_WORKSPACE"
           node -e "import('@vivariumjs/agent').then((m) => { const n = Object.keys(m).length; if (!n) throw new Error('empty surface'); console.log('imported', n, 'exports'); }).catch((e) => { console.error(e); process.exit(1); })"

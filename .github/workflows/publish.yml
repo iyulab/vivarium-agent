@@ -1,0 +1,45 @@
+name: publish
+
+# 0.X release train: pushing a version tag (v0.0.1, ...) publishes
+# @vivariumjs/agent to npm with provenance, then verifies it from the
+# registry as a fresh consumer. NPM_TOKEN is an org-level automation token.
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm --provenance
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - name: Tag matches the package version
+        id: meta
+        run: |
+          v=$(node -p "require('./package.json').version")
+          if [ "v$v" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package version $v" >&2
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - run: npm ci
+      - run: npm test
+      - run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Verify the published package from the registry
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir consumer && cd consumer
+          echo '{"name":"consumer","private":true,"type":"module"}' > package.json
+          for i in $(seq 1 30); do
+            npm install --no-audit --no-fund "@vivariumjs/agent@${{ steps.meta.outputs.version }}" && break
+            sleep 10
+          done
+          node -e "import('@vivariumjs/agent').then((m) => { if (!Object.keys(m).length) throw new Error('empty surface'); console.log('registry ok:', Object.keys(m).length, 'exports'); }).catch((e) => { console.error(e); process.exit(1); })"
