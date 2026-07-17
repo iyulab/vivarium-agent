@@ -26,3 +26,13 @@ jobs:
         working-directory: vivarium-agent
       - run: npm test
         working-directory: vivarium-agent
+      # Consumer-contact smoke (Phase 5.a): a fresh consumer package installs
+      # this repo and imports the public surface. Still sibling-dependent —
+      # true standalone consumption waits on the registry publish (the file:
+      # dependency issue tracked for Phase 5.b).
+      - name: Fresh consumer installs and imports @vivarium/agent
+        run: |
+          mkdir "$RUNNER_TEMP/consumer" && cd "$RUNNER_TEMP/consumer"
+          echo '{"name":"consumer","private":true,"type":"module"}' > package.json
+          npm install --no-audit --no-fund "$GITHUB_WORKSPACE/vivarium-agent"
+          node -e "import('@vivarium/agent').then((m) => { const n = Object.keys(m).length; if (!n) throw new Error('empty surface'); console.log('imported', n, 'exports'); }).catch((e) => { console.error(e); process.exit(1); })"
