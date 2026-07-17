@@ -22,6 +22,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+      # The SDK's exports point at dist/ — sibling consumers build it once.
+      - name: Build sibling @vivarium/changeset dist
+        run: npm ci && npm run build
+        working-directory: vivarium-changeset/sdk/typescript
       - run: npm install
         working-directory: vivarium-agent
       - run: npm test
