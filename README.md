@@ -21,7 +21,7 @@ Vivarium Agent is the harness that supplies all three: it consumes **edit contex
 ## What this repository contains
 
 - **The harness.** Session management, edit-context ingestion, knowledge retrieval orchestration, changeset assembly and validation. The plumbing that makes an LLM into a disciplined editor.
-- **The knowledge interface.** A pluggable slot for domain knowledge — the runtime's primitive catalog, the target platform's schema conventions, methodology rules (e.g. [Formology](https://github.com/iyulab/Formology)-style entity derivation), house style. Knowledge is data fed to the harness, not code baked into it.
+- **The knowledge interface.** A pluggable slot for domain knowledge — the runtime's primitive catalog, the target platform's schema conventions, methodology rules (e.g. entity-derivation conventions), house style. Knowledge is data fed to the harness, not code baked into it.
 - **The proposal loop.** Multi-turn refinement: the agent proposes a changeset, the human (or a policy) reviews, the conversation continues with the proposal as shared state.
 
 ## What this repository is not
