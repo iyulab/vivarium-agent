@@ -98,7 +98,7 @@ test("validate-retry loop: spec errors are fed back and recovered from", async (
   assert.match(result.outcome.retries[0].errors.join(" "), /explanation/);
   // The retry prompt must carry the validation errors back to the model.
   const retryPrompt = scripted.requests.at(-1);
-  assert.match(retryPrompt.user, /FAILED SPEC VALIDATION/);
+  assert.match(retryPrompt.user, /FAILED VALIDATION/);
   assert.match(retryPrompt.user, /explanation/);
 });
 
@@ -112,6 +112,71 @@ test("output is a changeset or nothing: exhaustion yields null, never junk", asy
   assert.equal(result.outcome.status, "exhausted");
   assert.equal(result.outcome.attempts, 2);
   assert.equal(result.outcome.retries.length, 2);
+});
+
+test("generate prompt carries the INTENT on every attempt (retry keeps the instruction)", async () => {
+  // Regression: 0.0.2 sent only PLAN+ARTIFACTS to generation; a retry whose
+  // error section stressed format compliance lost the edit instruction and
+  // the model regenerated the base verbatim (dogfooding M7, 3/3 repro).
+  const invalid = "this is not json";
+  const scripted = scriptedProvider([invalid, VALID_PAYLOAD]);
+  const harness = createAgentHarness({ provider: scripted.provider, clock: FIXED_CLOCK });
+
+  const result = await harness.propose({
+    intent: "표 제목을 '상위 제품'으로 바꿔줘",
+    artifacts: { "screen-main": "export default function mount() {}" },
+  });
+
+  assert.ok(result.proposal);
+  const generatePrompts = scripted.requests.slice(1); // [0] is the plan call
+  assert.equal(generatePrompts.length, 2, "one failed attempt + one retry");
+  for (const request of generatePrompts) {
+    assert.match(request.user, /INTENT:\n<<UNTRUSTED>> \(user intent/);
+    assert.ok(request.user.includes("표 제목을 '상위 제품'으로 바꿔줘"), "intent text present");
+  }
+});
+
+test("no-op generation is retried with a pointed error, then validated when the change lands", async () => {
+  const noop = JSON.stringify({
+    uiPatches: [
+      { artifactId: "screen-main", newContent: "base content", explanation: "unchanged regeneration" },
+    ],
+  });
+  const real = JSON.stringify({
+    uiPatches: [
+      { artifactId: "screen-main", newContent: "changed content", explanation: "Implements the intent." },
+    ],
+  });
+  const scripted = scriptedProvider([noop, real]);
+  const harness = createAgentHarness({ provider: scripted.provider, clock: FIXED_CLOCK });
+
+  const result = await harness.propose({
+    intent: "change it",
+    artifacts: { "screen-main": "base content" },
+  });
+
+  assert.ok(result.proposal, "second attempt ships");
+  assert.equal(result.proposal.provenance.attempts, 2);
+  assert.match(result.outcome.retries[0].errors.join(" "), /no-op output/);
+  const retryPrompt = scripted.requests.at(-1);
+  assert.match(retryPrompt.user, /no-op output/, "retry tells the model nothing changed");
+});
+
+test("persistent no-op exhausts — a changeset that changes nothing never ships as validated", async () => {
+  const noop = JSON.stringify({
+    uiPatches: [
+      { artifactId: "screen-main", newContent: "base content", explanation: "unchanged" },
+    ],
+  });
+  const scripted = scriptedProvider([noop]);
+  const harness = createAgentHarness({ provider: scripted.provider, clock: FIXED_CLOCK, maxAttempts: 2 });
+
+  const result = await harness.propose({ intent: "change it", artifacts: { "screen-main": "base content" } });
+
+  assert.equal(result.proposal, null);
+  assert.equal(result.outcome.status, "exhausted");
+  assert.equal(result.outcome.retries.length, 2);
+  assert.match(result.outcome.retries[1].errors.join(" "), /no-op output/);
 });
 
 test("injection defense: screen content enters prompts only inside labeled untrusted fences", async () => {

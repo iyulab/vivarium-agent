@@ -40,15 +40,24 @@ const scripted: ModelProvider = {
   name: "scripted-example", // recorded in provenance
   async complete(request) {
     if (request.system.includes("planner")) {
-      return "1. Retitle the heading to Orders.";
+      return "1. Apply the requested edit to the heading.";
     }
+    // Generator calls carry the user INTENT (inside an untrusted fence) on
+    // every attempt — key the canned output off it, as a real model would.
+    // A generation that changes nothing relative to the live base is a
+    // no-op: the strategy retries it and, if persistent, exhausts — a
+    // changeset that changes nothing never ships as validated.
+    const content = request.user.includes("total row")
+      ? "export default function mount(root) { root.innerHTML = '<strong>Orders</strong> <em>Total: 42</em>'; }"
+      : request.user.includes("bolder")
+        ? "export default function mount(root) { root.innerHTML = '<strong>Orders</strong>'; }"
+        : "export default function mount(root) { root.textContent = 'Orders'; }";
     return JSON.stringify({
       uiPatches: [
         {
           artifactId: "screen-main",
-          newContent:
-            "export default function mount(root) { root.textContent = 'Orders'; }",
-          explanation: "Retitle the heading to Orders.",
+          newContent: content,
+          explanation: "Apply the requested edit to the heading.",
         },
       ],
     });
