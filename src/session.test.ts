@@ -67,18 +67,21 @@ test("refine produces a new changeset based on the previous one", async () => {
   assert.equal(validate(doc).valid, true);
   assert.equal(verifyFingerprint(doc), true);
 
-  // ① The refined changeset's ui base is the PREVIOUS proposal's output.
+  // ① The refined changeset's declared ui base stays at the LIVE origin —
+  //    the prior proposal was never applied, so anchoring to its projection
+  //    would make this changeset unappliable under apply-side drift gates.
   const ui = (doc.patches as { ui: Array<Record<string, unknown>> }).ui[0];
-  assert.equal(ui.baseFingerprint, artifactFingerprint(CONTENT_A));
+  assert.equal(ui.baseFingerprint, artifactFingerprint(BASE));
 
-  // ② Session lineage lands in changeset provenance.baseState.
+  // ② Session lineage lands in changeset provenance.baseState — the draft
+  //    chain is carried here, not in the ui-artifact base entries.
   const baseState = (doc.provenance as { baseState: Array<Record<string, unknown>> }).baseState;
   const lineage = baseState.find((e) => e.kind === "changeset");
   assert.ok(lineage, "baseState must record the prior changeset");
   assert.equal(lineage.ref, "proposal-session:s1#1");
   assert.equal(lineage.fingerprint, first.proposal.fingerprint);
   const uiBase = baseState.find((e) => e.kind === "ui-artifact" && e.ref === "screen-main");
-  assert.equal(uiBase?.fingerprint, artifactFingerprint(CONTENT_A));
+  assert.equal(uiBase?.fingerprint, artifactFingerprint(BASE));
 
   // Agent-side provenance carries the refinement anchor too.
   assert.equal(second.proposal.provenance.refinedFrom, first.proposal.fingerprint);
@@ -153,11 +156,39 @@ test("an exhausted turn never advances the shared state", async () => {
   assert.ok(third.proposal);
   const doc = third.proposal.changeset;
   const ui = (doc.patches as { ui: Array<Record<string, unknown>> }).ui[0];
-  assert.equal(ui.baseFingerprint, artifactFingerprint(CONTENT_A), "base skips the exhausted turn");
+  assert.equal(ui.baseFingerprint, artifactFingerprint(BASE), "declared base stays at the live origin");
   const lineage = (doc.provenance as { baseState: Array<Record<string, unknown>> }).baseState.find(
     (e) => e.kind === "changeset",
   );
   assert.equal(lineage?.ref, "proposal-session:s3#1", "lineage anchors to the last validated turn");
+});
+
+test("refine re-bases to the live artifacts when the world moved (apply-each-turn flow)", async () => {
+  const scripted = sessionProvider([
+    payload(CONTENT_A, "Make the button bigger."),
+    payload(CONTENT_B, "Round the corners."),
+  ]);
+  const session = createProposalSession({
+    provider: scripted.provider,
+    clock: FIXED_CLOCK,
+    sessionId: "s4",
+  });
+
+  await session.propose({ intent: "크게", artifacts: { "screen-main": BASE } });
+  // The host applied turn 1 — the live world is now CONTENT_A. It tells the
+  // session so the next changeset declares (and diffs against) that state.
+  const second = await session.refine("둥글게", {
+    baseArtifacts: { "screen-main": CONTENT_A },
+  });
+  assert.ok(second.proposal);
+  const doc = second.proposal.changeset;
+  const ui = (doc.patches as { ui: Array<Record<string, unknown>> }).ui[0];
+  assert.equal(ui.baseFingerprint, artifactFingerprint(CONTENT_A));
+  const baseState = (doc.provenance as { baseState: Array<Record<string, unknown>> }).baseState;
+  const uiBase = baseState.find((e) => e.kind === "ui-artifact" && e.ref === "screen-main");
+  assert.equal(uiBase?.fingerprint, artifactFingerprint(CONTENT_A));
+  // The re-base sticks for subsequent turns until overridden again.
+  assert.equal(session.artifacts()["screen-main"], CONTENT_B, "refinement anchor still advances");
 });
 
 test("session misuse fails loudly", async () => {

@@ -37,6 +37,12 @@ export interface ProposeRequest {
   editContext?: EditContextInput | null;
   /** Current artifact contents by id — base state for ui patches. */
   artifacts?: Record<string, string>;
+  /**
+   * The live artifacts the changeset will be applied to, when they differ
+   * from `artifacts` (proposal-loop refine turns pass the prior proposal's
+   * projection as `artifacts`). See StrategyInput.baseArtifacts.
+   */
+  baseArtifacts?: Record<string, string> | null;
   /** Present when this proposal refines a prior one (proposal loop). */
   prior?: PriorProposalContext | null;
 }
@@ -98,6 +104,7 @@ export function createAgentHarness(options: AgentHarnessOptions): AgentHarness {
         intent: request.intent,
         editContext,
         artifacts: request.artifacts ?? {},
+        baseArtifacts: request.baseArtifacts ?? null,
         knowledge: retrieved,
         provider: options.provider,
         now: clock(),

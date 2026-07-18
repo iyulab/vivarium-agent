@@ -1,6 +1,6 @@
 {
   "name": "@vivariumjs/agent",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Agent harness that turns natural-language intent and on-screen selection into verified changesets — pluggable model provider, knowledge, and strategy. Output is a changeset or nothing.",
   "type": "module",
   "license": "Apache-2.0",

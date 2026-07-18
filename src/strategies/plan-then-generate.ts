@@ -127,12 +127,20 @@ export function createPlanThenGenerateStrategy(): ProposalStrategy {
         const raw = await input.provider.complete(buildGeneratePrompt(input, plan, errors));
         try {
           const payload = extractJson(raw);
+          // The base the changeset declares (and diffs against) is the LIVE
+          // world state, not the refinement anchor: in a session's refine
+          // turn input.artifacts is the prior proposal's projection — a state
+          // that may never have existed on any stage. Anchoring ui-artifact
+          // entries/baseContent there makes the changeset unappliable under
+          // the drift gate; the draft chain belongs to the changeset-kind
+          // lineage entry below (which apply gates exempt).
+          const base = input.baseArtifacts ?? input.artifacts;
           let draft = createChangeset({
             intent: input.intent,
             producedBy: `vivarium-agent/${this.name} provider:${input.provider.name}`,
             createdAt: input.now,
             baseState: [
-              ...Object.entries(input.artifacts).map(([id, content]) => ({
+              ...Object.entries(base).map(([id, content]) => ({
                 kind: "ui-artifact",
                 ref: id,
                 fingerprint: artifactFingerprint(content),
@@ -148,7 +156,7 @@ export function createPlanThenGenerateStrategy(): ProposalStrategy {
           for (const patch of payload.uiPatches ?? []) {
             draft = addUiPatch(draft, {
               artifactId: patch.artifactId,
-              baseContent: input.artifacts[patch.artifactId] ?? null,
+              baseContent: base[patch.artifactId] ?? null,
               newContent: patch.newContent,
               explanation: patch.explanation,
             });

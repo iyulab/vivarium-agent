@@ -39,6 +39,18 @@ export interface StrategyInput {
   editContext: EditContextInput | null;
   /** Current artifact contents by id — the base state ui patches diff against. */
   artifacts: Record<string, string>;
+  /**
+   * The artifacts of the world the emitted changeset will be APPLIED to (the
+   * live state), when it differs from `artifacts`. In a proposal session's
+   * refine turn, `artifacts` is the projection of the prior (not yet released)
+   * proposal — the refinement anchor for the model — while the world is still
+   * at the state the chain started from. Strategies must anchor the
+   * changeset's `kind:"ui-artifact"` baseState entries and ui-patch
+   * baseContent to THIS state (falling back to `artifacts` when absent), so
+   * the emitted changeset stays appliable; the draft chain itself is carried
+   * by the `kind:"changeset"` lineage entry.
+   */
+  baseArtifacts?: Record<string, string> | null;
   knowledge: RetrievedKnowledge[];
   provider: ModelProvider;
   /** RFC 3339 timestamp supplied by the harness clock (determinism). */

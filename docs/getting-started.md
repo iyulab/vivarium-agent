@@ -173,6 +173,27 @@ An exhausted turn does **not** advance the shared state — the next `refine`
 still builds on the last *validated* proposal. Re-selection mid-session is
 supported: pass `{ editContext }` as the second argument to `refine`.
 
+**Declared base vs refinement anchor.** The projection a `refine` builds on
+is the *model's* anchor only. The emitted changeset's `kind:"ui-artifact"`
+baseState entries (and each ui patch's `baseContent`) stay anchored to the
+**live artifacts the session knows** — initially the ones passed to
+`propose()` — so a draft chain whose intermediates were never applied still
+emits changesets an applier (e.g. `vivarium-stage`'s drift gate) will
+accept; the draft chain is carried by the `kind:"changeset"` lineage entry
+instead. When the world *does* move — you applied one of the session's
+proposals, or an external change landed — tell the session on the next
+turn:
+
+```ts
+// After you APPLY a proposal, the live artifacts move to its projection —
+// tell the session, so the next changeset declares that state as its base:
+const liveArtifacts = session.artifacts(); // == what your applier returned
+const rebased = await session.refine("Now bold the total row", {
+  baseArtifacts: liveArtifacts,
+});
+if (!rebased.proposal) throw new Error("re-based turn must validate");
+```
+
 ## 4. Knowledge sources
 
 Knowledge (primitive catalogs, schema conventions, house rules) is data
