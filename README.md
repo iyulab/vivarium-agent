@@ -47,6 +47,11 @@ Vivarium Agent is the harness that supplies all three: it consumes **edit contex
 - Default strategy: plan-then-generate with a bounded validate-retry loop
   (the validator is the changeset SDK — deterministic, not a model).
   Strategies are swappable modules; this is a default, not a commitment.
+- Surgical changes ride as `verified-diff@0` (changeset spec 0.2): the model
+  answers with exact-substring edits, the strategy derives the strict-dialect
+  diff via the SDK — the diff is computed, never model-written, and full
+  `newContent` (whole-artifact) remains the universal fallback shape. The
+  document's `specVersion` stays at the lowest version its features require.
 - Session composition: a refinement is authored against the world *plus* the
   prior validated proposal (its projection becomes the base artifacts), and
   that lineage is machine-readable in the changeset's `provenance.baseState`

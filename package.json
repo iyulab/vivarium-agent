@@ -1,6 +1,6 @@
 {
   "name": "@vivariumjs/agent",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Agent harness that turns natural-language intent and on-screen selection into verified changesets — pluggable model provider, knowledge, and strategy. Output is a changeset or nothing.",
   "type": "module",
   "license": "Apache-2.0",
@@ -35,7 +35,7 @@
     "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
-    "@vivariumjs/changeset": "^0.1.0"
+    "@vivariumjs/changeset": "^0.2.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
