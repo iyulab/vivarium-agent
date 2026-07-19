@@ -23,6 +23,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { verifyAgainstBase } from "@vivariumjs/changeset";
+import type { VerifiedDiffUiPatch } from "@vivariumjs/changeset";
 import { createAgentHarness } from "./harness.ts";
 import type { AgentHarnessOptions, ProposeRequest, ProposeResult } from "./harness.ts";
 import type { EditContextInput } from "./ports.ts";
@@ -75,20 +77,27 @@ export interface ProposalSession {
   };
 }
 
-interface UiPatchLike {
-  artifactId: string;
-  newContent: string;
-  explanation: string;
-}
+/**
+ * A ui patch is one of two profiles (spec §5.2.2): whole-artifact@0 carries
+ * the full `newContent`; verified-diff@0 carries only a `diff` (+ fingerprints)
+ * and the result must be reconstructed by applying it to the matching base.
+ */
+type UiPatch =
+  | { profile: "whole-artifact@0"; artifactId: string; newContent: string; explanation: string }
+  | VerifiedDiffUiPatch;
 
-function uiPatchesOf(changeset: Record<string, unknown>): UiPatchLike[] {
-  const patches = changeset.patches as { ui?: UiPatchLike[] } | undefined;
+function uiPatchesOf(changeset: Record<string, unknown>): UiPatch[] {
+  const patches = changeset.patches as { ui?: UiPatch[] } | undefined;
   return patches?.ui ?? [];
 }
 
 function explanationsOf(changeset: Record<string, unknown>): string[] {
   const patches = changeset.patches as
-    | { schema?: Array<{ explanation?: string }>; ui?: UiPatchLike[]; data?: Array<{ explanation?: string }> }
+    | {
+        schema?: Array<{ explanation?: string }>;
+        ui?: Array<{ explanation?: string }>;
+        data?: Array<{ explanation?: string }>;
+      }
     | undefined;
   const all = [
     ...(patches?.schema ?? []),
@@ -126,9 +135,35 @@ export function createProposalSession(options: ProposalSessionOptions): Proposal
 
     if (result.proposal) {
       // Advance the shared state: project ui patches onto the base artifacts.
+      // whole-artifact@0 carries newContent directly; verified-diff@0 carries
+      // only a diff (spec §5.2.2) — reconstruct its result by applying the diff
+      // to the content matching baseFingerprint (the strategy diffed against
+      // baseArtifacts ?? artifacts). A base mismatch or unknown profile is a
+      // loud failure, never a silent undefined that a later refine turn would
+      // feed to the model (regression: verified-diff surgical turn crashed the
+      // next refine — issues/ISSUE-vivarium-agent-20260719-233000).
       const projected = { ...(request.artifacts ?? {}) };
       for (const patch of uiPatchesOf(result.proposal.changeset)) {
-        projected[patch.artifactId] = patch.newContent;
+        if (patch.profile === "verified-diff@0") {
+          const base = request.baseArtifacts?.[patch.artifactId] ?? request.artifacts?.[patch.artifactId];
+          if (typeof base !== "string") {
+            throw new Error(`session projection: no base content for verified-diff patch ${patch.artifactId}`);
+          }
+          const verdict = verifyAgainstBase(patch, base);
+          if (!verdict.ok) {
+            throw new Error(
+              `session projection: verified-diff patch for ${patch.artifactId} did not apply to base — ` +
+                verdict.errors.map((e) => e.message).join("; "),
+            );
+          }
+          projected[patch.artifactId] = verdict.newContent;
+        } else if (patch.profile === "whole-artifact@0") {
+          projected[patch.artifactId] = patch.newContent;
+        } else {
+          throw new Error(
+            `session projection: ui patch has unknown profile ${String((patch as unknown as { profile?: unknown }).profile)}`,
+          );
+        }
       }
       artifacts = projected;
       lastValidated = {

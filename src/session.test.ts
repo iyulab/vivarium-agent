@@ -12,6 +12,9 @@ const CONTENT_C = "export default function mount() { /* bigger, rounded, blue bu
 const payload = (newContent: string, explanation: string) =>
   JSON.stringify({ uiPatches: [{ artifactId: "screen-main", newContent, explanation }] });
 
+const uiEditsPayload = (find: string, replace: string, explanation: string) =>
+  JSON.stringify({ uiEdits: [{ artifactId: "screen-main", find, replace, explanation }] });
+
 /**
  * Scripted provider for multi-turn sessions: planner calls (recognized by
  * their system prompt) return canned plans; generator calls consume a queue.
@@ -189,6 +192,41 @@ test("refine re-bases to the live artifacts when the world moved (apply-each-tur
   assert.equal(uiBase?.fingerprint, artifactFingerprint(CONTENT_A));
   // The re-base sticks for subsequent turns until overridden again.
   assert.equal(session.artifacts()["screen-main"], CONTENT_B, "refinement anchor still advances");
+});
+
+test("verified-diff surgical turn projects correctly and does not crash the next refine", async () => {
+  // Regression: issues/ISSUE-vivarium-agent-20260719-233000. A surgical turn
+  // emits a verified-diff@0 patch (diff only, no newContent); the session
+  // projection blindly read patch.newContent → undefined → the next refine fed
+  // undefined artifact content to the model prompt and threw uncaught (HTTP
+  // 500). Mirrors drive-scenario's apply-each-turn flow (baseArtifacts per turn).
+  const SEED = "export default function mount(){ /* empty */ }";
+  const V1 = 'export default function mount(){ render("Top Products"); }';
+  const V2 = 'export default function mount(){ render("Best Sellers"); }';
+  const V3 = 'export default function mount(){ render("Best Sellers"); /* bulk */ }';
+  const scripted = sessionProvider([
+    payload(V1, "Build the table."), // turn 1 — whole-artifact build
+    uiEditsPayload("Top Products", "Best Sellers", "retitle"), // turn 2 — surgical (verified-diff)
+    payload(V3, "Bulk tweak."), // turn 3 — must not crash
+  ]);
+  const session = createProposalSession({ provider: scripted.provider, clock: FIXED_CLOCK, sessionId: "svd" });
+
+  const t1 = await session.propose({ intent: "build", artifacts: { "screen-main": SEED } });
+  assert.ok(t1.proposal, "turn 1 validated");
+
+  // Host applied turn 1 → live is V1; it tells the session (apply-each-turn).
+  const t2 = await session.refine("표 제목만 교체", { baseArtifacts: { "screen-main": V1 } });
+  assert.ok(t2.proposal, "turn 2 (surgical) validated");
+  // The turn actually exercised the verified-diff path (not whole-artifact).
+  const ui2 = (t2.proposal.changeset.patches as { ui: Array<Record<string, unknown>> }).ui[0];
+  assert.equal(ui2.profile, "verified-diff@0", "surgical turn emits a verified-diff patch");
+  // The projection reconstructed V2 from the diff — NOT undefined (the bug).
+  assert.equal(session.artifacts()["screen-main"], V2, "verified-diff projected to applied result");
+
+  // Host applied turn 2 → live is V2. The next refine must not crash.
+  const t3 = await session.refine("일괄 변경", { baseArtifacts: { "screen-main": V2 } });
+  assert.ok(t3.proposal, "turn 3 after a verified-diff turn is validated (was HTTP 500)");
+  assert.equal(session.artifacts()["screen-main"], V3, "shared state advanced through the verified-diff turn");
 });
 
 test("session misuse fails loudly", async () => {
