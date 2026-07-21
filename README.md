@@ -2,7 +2,7 @@
 
 > Agent harness that turns natural-language intent and on-screen selection into verified changesets, with pluggable domain knowledge.
 
-**Status: harness core + proposal loop implemented (pre-0.1).** This document fixes the harness's purpose, boundaries, and the contract it lives by. The core — pluggable provider/knowledge/strategy ports, the plan-then-generate default strategy with a spec-validate retry loop, provenance recording, and the multi-turn proposal session (refinements chain on the prior proposal, with lineage recorded in provenance) — is implemented and tested; model choices and retrieval design remain open.
+**Status: published on npm — [`@vivariumjs/agent`](https://www.npmjs.com/package/@vivariumjs/agent), 0.x** (pre-1.0: minor versions may change the surface — see the [changelog](CHANGELOG.md)). This document fixes the harness's purpose, boundaries, and the contract it lives by. The core — pluggable provider/knowledge/strategy ports, the plan-then-generate default strategy with a spec-validate retry loop, provenance recording, and the multi-turn proposal session (refinements chain on the prior proposal, with lineage recorded in provenance) — is implemented and tested; model choices and retrieval design remain open.
 
 **To host it in your app, start with the [getting-started guide](docs/getting-started.md)** (`npm install @vivariumjs/agent`).
 
