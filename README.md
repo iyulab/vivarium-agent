@@ -6,6 +6,11 @@
 
 **To host it in your app, start with the [getting-started guide](docs/getting-started.md)** (`npm install @vivariumjs/agent`).
 
+**Supported Node**: the package declares `engines.node >= 20`, and CI runs a fresh
+consumer install on that floor every build — the floor is executed, not just claimed.
+It is a *supported* floor, not a recommendation: Node 20 reached end-of-life on
+2026-04-30, so an actively supported release line is the better choice for new work.
+
 ---
 
 ## Why
