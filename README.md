@@ -67,6 +67,13 @@ Vivarium Agent is the harness that supplies all three: it consumes **edit contex
 
 ## Relationship to the Vivarium family
 
+A running instance of the family — propose, preview, approve, apply, roll back — is
+browsable as a gallery of archived runs: [vivarium-gallery](https://github.com/iyulab/vivarium-gallery)
+([live](https://iyulab.github.io/vivarium-gallery/)). Each exhibit keeps the final artifacts, the
+turn ledger and the rollback record of an actual run, so the claims above can be checked
+rather than taken on faith.
+
+
 Depends on [`vivarium-changeset`](https://github.com/iyulab/vivarium-changeset) (its output contract) and consumes the edit-context format published by [`vivarium`](https://github.com/iyulab/vivarium). It has no dependency on `vivarium-stage` — the agent doesn't know or care who applies its proposals.
 
 Standalone use is a first-class scenario: any product wanting a *"conversational editor that proposes reviewable changes"* — regardless of what it edits — can host this harness with its own knowledge plug and its own applier.
