@@ -47,6 +47,42 @@ const scripted: ModelProvider = {
     // A generation that changes nothing relative to the live base is a
     // no-op: the strategy retries it and, if persistent, exhausts — a
     // changeset that changes nothing never ships as validated.
+    if (request.user.includes("restock date")) {
+      // Section 3: the schema and data facets are in this prompt, so the
+      // generation can name a real entity and select a real row.
+      return JSON.stringify({
+        schemaOps: [
+          {
+            op: "field.add",
+            entity: "item",
+            field: { name: "restockAt", type: "date" },
+            explanation: "Add the restock date to the item entity.",
+          },
+        ],
+        dataPatches: [
+          {
+            id: "seed-restock",
+            explanation: "Seed the restock date for the existing item.",
+            operations: [
+              {
+                op: "update",
+                entity: "item",
+                where: { field: "id", equals: "sku-1" },
+                set: { restockAt: "2026-08-20" },
+              },
+            ],
+          },
+        ],
+        uiPatches: [
+          {
+            artifactId: "screen-main",
+            newContent:
+              "export default function mount(root) { root.textContent = 'Restock: 2026-08-20'; }",
+            explanation: "Show the restock date on screen.",
+          },
+        ],
+      });
+    }
     const content = request.user.includes("total row")
       ? "export default function mount(root) { root.innerHTML = '<strong>Orders</strong> <em>Total: 42</em>'; }"
       : request.user.includes("bolder")
@@ -144,7 +180,175 @@ There is no third shape: no unvalidated draft, no partial output. What the
 harness hands you is safe to forward to a reviewer and an applier (e.g.
 `vivarium-stage`) — the harness itself has no apply authority by design.
 
-## 3. Sessions: refinement with lineage
+## 3. Three facets: let the proposal touch schema and data
+
+A changeset has three facets — schema, UI, and data — so the harness takes
+three too. Pass the **live schema and data** alongside the artifacts and the
+proposal can move all three together:
+
+```ts
+import type { SchemaInput, DataInput } from "@vivariumjs/agent";
+
+const schema: SchemaInput = {
+  entities: [
+    {
+      name: "item",
+      fields: [
+        { name: "id", type: "string", required: true },
+        { name: "name", type: "string", required: true },
+      ],
+    },
+  ],
+};
+
+const data: DataInput = {
+  entities: { item: [{ id: "sku-1", name: "Bolt" }] },
+};
+
+const threeFacet = await harness.propose({
+  intent: "Add a restock date to items and show it",
+  artifacts: {
+    "screen-main":
+      "export default function mount(root) { root.textContent = 'Home'; }",
+  },
+  schema,
+  data,
+});
+
+if (!threeFacet.proposal) {
+  throw new Error(`exhausted: ${JSON.stringify(threeFacet.outcome)}`);
+}
+
+// What the model was shown is recorded, so a reviewer can tell a considered
+// choice from a blind spot: a proposal that touches no data reads one way when
+// the rows were visible and another when they were not.
+if (threeFacet.proposal.provenance.facetsSeen.join() !== "schema,data") {
+  throw new Error("provenance records which facets reached the prompts");
+}
+
+// All three facets moved in ONE reviewable, atomically-appliable document —
+// which is the point: a field declared in the schema and shown on screen but
+// absent from every row is an incomplete change, not a finished one.
+const facets = threeFacet.proposal.changeset.patches as {
+  schema?: unknown[];
+  ui?: unknown[];
+  data?: unknown[];
+};
+if (!facets.schema?.length || !facets.ui?.length || !facets.data?.length) {
+  throw new Error("expected a change spanning schema, ui and data");
+}
+```
+
+Both are **optional**: omit them and the harness behaves exactly as it did
+before — a UI-only host is unaffected. What they change is what the model
+can see:
+
+- **`schema`** is the state a schema operation is authored against. `field.add`
+  needs the entity's name and the fields already on it; `field.rename`,
+  `field.retype` and `field.remove` need to know the target exists. Without
+  it, the operation would have to be guessed.
+- **`data`** is the rows an `update` or `delete` `where` clause can select.
+  Without it, a row identifier can only be invented.
+
+Both shapes speak the changeset spec's own vocabulary (§5.1 logical schema
+operations, §5.3 data operations), so they are the same view for every host
+— producing them from your backend is your adapter's job.
+
+Three things worth knowing:
+
+- **What you supplied is recorded.** `provenance.facetsSeen` lists the facets
+  that reached the prompts (`[]` when none did). It is not the changeset's
+  `provenance.baseState` — that declares a fingerprinted state an applier's
+  drift gate checks, a stronger claim than this one. `facetsSeen` answers a
+  reviewer's question the document otherwise cannot: was a change that touched
+  no data a considered choice, or a blind spot?
+- **Supplied-but-empty is a fact.** `{ entities: [] }` says "there are none";
+  omitting the field says "the host did not supply it". The harness reports
+  them differently, because a model that cannot tell the two apart will
+  assume the facet does not exist.
+- **Nothing is sampled or truncated.** Whatever you pass is what the model
+  sees. Trimming a large data facet is your call, made where the cost is
+  known — silently showing the model a subset would recreate the exact
+  problem this input solves: a `where` written against rows it never saw.
+
+Schema and data enter the prompts inside the same labeled untrusted fences
+screen content does (§6) — field names and row values are authored outside
+your process.
+
+### Mistargeted operations are refused at authoring time
+
+Well-formed is not well-targeted. The changeset validator can check that
+`field.add` carries an entity and a field; it has never seen your world, so it
+cannot check that the entity exists. Once you supply the facets, the harness
+can — and does:
+
+```ts
+let attempt = 0;
+const insistent: ModelProvider = {
+  name: "scripted-mistarget",
+  async complete(request) {
+    if (request.system.includes("planner")) return "1. Rename a field.";
+    attempt += 1;
+    // First attempt targets an entity that does not exist; the second one
+    // takes the correction and targets a real field.
+    return attempt === 1
+      ? JSON.stringify({
+          schemaOps: [
+            {
+              op: "field.rename",
+              entity: "invoice",
+              field: "due",
+              newName: "dueAt",
+              explanation: "Rename the due field.",
+            },
+          ],
+        })
+      : JSON.stringify({
+          schemaOps: [
+            {
+              op: "field.rename",
+              entity: "item",
+              field: "name",
+              newName: "title",
+              explanation: "Rename the name field.",
+            },
+          ],
+        });
+  },
+};
+
+const strict = createAgentHarness({ provider: insistent });
+const corrected = await strict.propose({
+  intent: "Rename the field",
+  artifacts: { "screen-main": "unchanged" },
+  schema,
+});
+
+if (!corrected.proposal) {
+  throw new Error("the corrected attempt should validate");
+}
+const [firstError] = corrected.outcome.retries[0].errors;
+if (!firstError.includes("invoice") || !firstError.includes("item")) {
+  throw new Error("the refusal names what does not exist and what does");
+}
+```
+
+The refusal is **retryable, not fatal**: it goes back to the model with the
+reason, naming both the missing target and the existing ones, so the next
+attempt has somewhere to go. A model that keeps insisting exhausts into
+`null` — same contract as always, a changeset or nothing.
+
+Two bounds are worth relying on:
+
+- **Only what you gave it the state to judge.** No `schema` means no schema
+  judgment; no `data` means no row judgment. Supplying only `schema` still
+  checks that an entity and a field exist, but not that a `where` selects a
+  real row — the rows were never shown.
+- **Judged against the world the changeset produces.** Creating an entity and
+  then adding a field to it in the same document is coherent, not
+  contradictory, so it is not refused.
+
+## 4. Sessions: refinement with lineage
 
 Multi-turn editing ("now make it bold") is a **proposal session**. Each
 `refine` builds on the projection of the previous validated proposal, and
@@ -203,7 +407,21 @@ const rebased = await session.refine("Now bold the total row", {
 if (!rebased.proposal) throw new Error("re-based turn must validate");
 ```
 
-## 4. Knowledge sources
+**Schema and data do not project — and that is load-bearing.** A session
+carries the facets you gave it across turns, and `refine` takes
+`{ schema }` / `{ data }` to re-base them when your backend moves. What it
+does *not* do is advance them itself, because a validated proposal is not an
+applied one: the live schema still lacks the field a previous turn declared.
+
+The consequence is worth stating plainly. If turn 1 adds a field and turn 2
+writes to it **without re-declaring it**, turn 2 is refused — that document
+would not apply on its own, since the field exists nowhere but in turn 1.
+Each turn's changeset stands alone against the live world; only the UI facet
+accumulates, because a projection is something the session can compute and a
+live backend's state is not. Re-base with `{ schema }` after you apply, or
+let the turn carry the `field.add` with it.
+
+## 5. Knowledge sources
 
 Knowledge (primitive catalogs, schema conventions, house rules) is data
 plugged into the harness, not code baked in. Every source consulted is
@@ -230,7 +448,7 @@ if (!audit.knowledgeSources.includes("house-rules")) {
 }
 ```
 
-## 5. Prompt-injection defense
+## 6. Prompt-injection defense
 
 Screen-derived content (element text, attributes — the `untrusted` map of
 the edit context) is attacker-reachable: anything a user typed into the

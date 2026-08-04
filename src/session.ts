@@ -27,7 +27,7 @@ import { verifyAgainstBase } from "@vivariumjs/changeset";
 import type { VerifiedDiffUiPatch } from "@vivariumjs/changeset";
 import { createAgentHarness } from "./harness.ts";
 import type { AgentHarnessOptions, ProposeRequest, ProposeResult } from "./harness.ts";
-import type { EditContextInput } from "./ports.ts";
+import type { EditContextInput, SchemaInput, DataInput } from "./ports.ts";
 import type { PriorProposalContext } from "./strategy.ts";
 
 export interface ProposalSessionOptions extends AgentHarnessOptions {
@@ -57,6 +57,14 @@ export interface RefineOverrides {
    * unaffected.
    */
   baseArtifacts?: Record<string, string>;
+  /**
+   * Re-base the non-UI facets: pass when the live schema or data moved since
+   * the session last knew it. A supplied facet REPLACES the session's view —
+   * it is a snapshot of the world, and merging two snapshots would describe a
+   * state that never existed. Omit to keep the current view.
+   */
+  schema?: SchemaInput | null;
+  data?: DataInput | null;
 }
 
 export interface ProposalSession {
@@ -119,6 +127,10 @@ export function createProposalSession(options: ProposalSessionOptions): Proposal
   // change the world.
   let baseArtifacts: Record<string, string> = {};
   let editContext: EditContextInput | null = null;
+  // The non-UI facets are sticky like editContext: the session keeps the view
+  // it was given until the caller says the world moved.
+  let schema: SchemaInput | null = null;
+  let data: DataInput | null = null;
   let lastValidated: PriorProposalContext | null = null;
 
   async function run(request: ProposeRequest): Promise<ProposeResult> {
@@ -185,6 +197,8 @@ export function createProposalSession(options: ProposalSessionOptions): Proposal
       artifacts = { ...(request.artifacts ?? {}) };
       baseArtifacts = { ...(request.baseArtifacts ?? request.artifacts ?? {}) };
       editContext = request.editContext ?? null;
+      schema = request.schema ?? null;
+      data = request.data ?? null;
       return run(request);
     },
 
@@ -198,11 +212,18 @@ export function createProposalSession(options: ProposalSessionOptions): Proposal
       if (overrides?.baseArtifacts) {
         baseArtifacts = { ...overrides.baseArtifacts };
       }
+      // `in` rather than truthiness: passing `null` explicitly clears the view
+      // ("the consumer no longer supplies this facet"), which is a different
+      // instruction from omitting the key ("keep what you have").
+      if (overrides && "schema" in overrides) schema = overrides.schema ?? null;
+      if (overrides && "data" in overrides) data = overrides.data ?? null;
       return run({
         intent: instruction,
         editContext,
         artifacts: { ...artifacts },
         baseArtifacts: { ...baseArtifacts },
+        schema,
+        data,
         prior: lastValidated,
       });
     },

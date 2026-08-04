@@ -13,6 +13,8 @@ export type {
   KnowledgeSource,
   KnowledgeQuery,
   EditContextInput,
+  SchemaInput,
+  DataInput,
 } from "./ports.ts";
 
 export type {

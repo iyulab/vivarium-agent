@@ -8,7 +8,13 @@
  * transition is recorded so the proposal loop can expose it as shared state.
  */
 
-import type { ModelProvider, KnowledgeQuery, EditContextInput } from "./ports.ts";
+import type {
+  ModelProvider,
+  KnowledgeQuery,
+  EditContextInput,
+  SchemaInput,
+  DataInput,
+} from "./ports.ts";
 
 export interface RetrievedKnowledge {
   source: string;
@@ -51,6 +57,19 @@ export interface StrategyInput {
    * by the `kind:"changeset"` lineage entry.
    */
   baseArtifacts?: Record<string, string> | null;
+  /**
+   * The live schema and data facets the change is authored against. The
+   * emitted document's facets are three (`patches.schema`/`ui`/`data`), so the
+   * input contract is three too — a strategy asked to emit schema and data
+   * operations while seeing only UI content can either invent identifiers or
+   * drop those facets, and both were measured happening.
+   *
+   * Optional: absent means "the consumer did not supply it", and the strategy
+   * behaves exactly as before. An empty `entities` means "there are none" —
+   * a different fact, and reported as such.
+   */
+  schema?: SchemaInput | null;
+  data?: DataInput | null;
   knowledge: RetrievedKnowledge[];
   provider: ModelProvider;
   /** RFC 3339 timestamp supplied by the harness clock (determinism). */

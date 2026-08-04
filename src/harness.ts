@@ -13,7 +13,13 @@
  * 5. The model is replaceable — providers are injected ports.
  */
 
-import type { ModelProvider, KnowledgeSource, EditContextInput } from "./ports.ts";
+import type {
+  ModelProvider,
+  KnowledgeSource,
+  EditContextInput,
+  SchemaInput,
+  DataInput,
+} from "./ports.ts";
 import type {
   ProposalStrategy,
   StrategyOutcome,
@@ -43,6 +49,18 @@ export interface ProposeRequest {
    * projection as `artifacts`). See StrategyInput.baseArtifacts.
    */
   baseArtifacts?: Record<string, string> | null;
+  /**
+   * The live schema facet the change is authored against (spec §5.1
+   * vocabulary). Supply it to let the proposal touch the schema facet: an
+   * operation naming an entity or field is only authorable against a schema
+   * the model can read.
+   */
+  schema?: SchemaInput | null;
+  /**
+   * The live data facet (spec §5.3 vocabulary) — the rows a `where` clause can
+   * select. Supply it to let the proposal touch the data facet.
+   */
+  data?: DataInput | null;
   /** Present when this proposal refines a prior one (proposal loop). */
   prior?: PriorProposalContext | null;
 }
@@ -56,6 +74,24 @@ export interface Proposal {
     strategy: string;
     provider: string;
     knowledgeSources: string[];
+    /**
+     * Which live facets the model was shown, sorted and deduplicated. Empty
+     * when none were supplied.
+     *
+     * Fixed principle 3 says what the agent was looking at is recorded so a
+     * reviewer can judge the proposal against the state it was made for. Once
+     * the schema and data facets became inputs, "what it was looking at" grew
+     * and this is the part of it the harness can state on its own. It matters
+     * because the answer changes how a proposal reads: a change that touches
+     * no data is a considered choice when the rows were visible and a blind
+     * spot when they were not, and nothing else in the document tells them
+     * apart.
+     *
+     * This is not the same as the changeset's `provenance.baseState`, which
+     * declares a fingerprinted state the applier's drift gate checks. This
+     * only reports what reached the prompts — a weaker and honest claim.
+     */
+    facetsSeen: Array<"schema" | "data">;
     attempts: number;
     /** Fingerprint of the proposal this one refines, when in a session. */
     refinedFrom: string | null;
@@ -105,6 +141,8 @@ export function createAgentHarness(options: AgentHarnessOptions): AgentHarness {
         editContext,
         artifacts: request.artifacts ?? {},
         baseArtifacts: request.baseArtifacts ?? null,
+        schema: request.schema ?? null,
+        data: request.data ?? null,
         knowledge: retrieved,
         provider: options.provider,
         now: clock(),
@@ -124,6 +162,10 @@ export function createAgentHarness(options: AgentHarnessOptions): AgentHarness {
             strategy: strategy.name,
             provider: options.provider.name,
             knowledgeSources: retrieved.map((k) => k.source),
+            facetsSeen: [
+              ...(request.schema ? (["schema"] as const) : []),
+              ...(request.data ? (["data"] as const) : []),
+            ],
             attempts: outcome.attempts,
             refinedFrom: request.prior?.fingerprint ?? null,
           },

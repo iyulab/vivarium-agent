@@ -35,6 +35,44 @@ export interface KnowledgeSource {
 }
 
 /**
+ * Agent-side structural view of the LIVE schema facet, in the changeset
+ * spec's own logical vocabulary (§5.1 — entities, fields, logical types).
+ *
+ * This is the state a schema operation is authored against, not an operation:
+ * `field.add` needs the entity's name and the fields already on it, and
+ * `field.rename`/`retype`/`remove` need to know the target exists. Producing
+ * that view from a backend is the consumer's adapter concern — the shape here
+ * is the spec's vocabulary, so it is the same view for every consumer.
+ */
+export interface SchemaInput {
+  entities: Array<{
+    name: string;
+    /**
+     * `type` is unconstrained on purpose: this describes what EXISTS, and the
+     * closed logical-type vocabulary (spec §5.1) constrains what may be
+     * EMITTED. A live schema carrying a type this version cannot express is
+     * still a fact the model should see, not a reason to refuse to read it.
+     */
+    fields: Array<{ name: string; type: string; required?: boolean }>;
+  }>;
+}
+
+/**
+ * Agent-side structural view of the LIVE data facet (spec §5.3 vocabulary):
+ * the rows an `update`/`delete` `where` clause can actually select.
+ *
+ * Passed verbatim to the model — the harness never samples or truncates. A
+ * silently trimmed view is worse than none: the model would author a `where`
+ * against rows it was never shown, which is the identifier invention this
+ * input exists to prevent. Deciding how much of a large facet the model should
+ * see is the consumer's call, made where the cost is known.
+ */
+export interface DataInput {
+  /** Rows keyed by entity name, matching `SchemaInput.entities[].name`. */
+  entities: Record<string, Array<Record<string, unknown>>>;
+}
+
+/**
  * Agent-side structural view of the edit-context contract v0.1
  * (produced by the vivarium runtime; consumed here).
  */

@@ -40,7 +40,7 @@ Vivarium Agent is the harness that supplies all three: it consumes **edit contex
 
 1. **Output is a changeset or nothing.** No side channels: the agent never calls a data API, never patches UI directly, never applies. Everything it wants to happen must be expressible in the contract — if it can't be, that's a contract discussion, not an excuse for a bypass.
 2. **Proposals are reviewable by construction.** Every emitted changeset validates against the spec, carries per-change explanations, and is fingerprinted before it leaves the harness.
-3. **Edit context in, provenance out.** What the agent was looking at (screen, selection, base state) is recorded in the changeset's provenance, so review can judge the proposal against the state it was made for.
+3. **Edit context in, provenance out.** What the agent was looking at (screen, selection, base state, and which live facets it was shown) is recorded, so review can judge the proposal against the state it was made for — including telling a considered choice apart from a blind spot.
 4. **Knowledge is pluggable and inspectable.** The harness must be able to say what knowledge sources informed a proposal. Swapping domains (a manufacturing platform vs. a note-taking tool) must not require changing harness code.
 5. **The model is replaceable.** No fixed principle may depend on the behavior of a specific LLM.
 
@@ -57,6 +57,17 @@ Vivarium Agent is the harness that supplies all three: it consumes **edit contex
   diff via the SDK — the diff is computed, never model-written, and full
   `newContent` (whole-artifact) remains the universal fallback shape. The
   document's `specVersion` stays at the lowest version its features require.
+- Input contract matches the output contract: a changeset has three facets, so
+  the harness accepts three. The live schema and data are optional first-class
+  inputs (`SchemaInput` / `DataInput`, in the specification's own vocabulary)
+  and they reach the generation step, not just planning — a step asked to emit
+  schema and data operations while seeing only UI content can only invent
+  identifiers or drop those facets. Omitting them is unchanged behavior.
+  Supplying them also lets the harness refuse, at authoring time, an operation
+  targeting an entity, field or row that does not exist; that check is bounded
+  to the facets it was given and judges against the world the changeset
+  produces. Judging whether the three facets *belong* together is not the
+  harness's job — that is a reviewer's.
 - Session composition: a refinement is authored against the world *plus* the
   prior validated proposal (its projection becomes the base artifacts), and
   that lineage is machine-readable in the changeset's `provenance.baseState`
