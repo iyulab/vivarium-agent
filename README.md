@@ -2,9 +2,9 @@
 
 > Agent harness that turns natural-language intent and on-screen selection into verified changesets, with pluggable domain knowledge.
 
-**Status: published on npm — [`@vivariumjs/agent`](https://www.npmjs.com/package/@vivariumjs/agent), 0.x** (pre-1.0: minor versions may change the surface — see the [changelog](CHANGELOG.md)). This document fixes the harness's purpose, boundaries, and the contract it lives by. The core — pluggable provider/knowledge/strategy ports, the plan-then-generate default strategy with a spec-validate retry loop, provenance recording, and the multi-turn proposal session (refinements chain on the prior proposal, with lineage recorded in provenance) — is implemented and tested; model choices and retrieval design remain open.
+**Status: published on npm — [`@vivariumjs/agent`](https://www.npmjs.com/package/@vivariumjs/agent), 0.x** (pre-1.0: minor versions may change the surface — see the [changelog](https://github.com/iyulab/vivarium-agent/blob/main/CHANGELOG.md)). This document fixes the harness's purpose, boundaries, and the contract it lives by. The core — pluggable provider/knowledge/strategy ports, the plan-then-generate default strategy with a spec-validate retry loop, provenance recording, and the multi-turn proposal session (refinements chain on the prior proposal, with lineage recorded in provenance) — is implemented and tested; model choices and retrieval design remain open.
 
-**To host it in your app, start with the [getting-started guide](docs/getting-started.md)** (`npm install @vivariumjs/agent`).
+**To host it in your app, start with the [getting-started guide](https://github.com/iyulab/vivarium-agent/blob/main/docs/getting-started.md)** (`npm install @vivariumjs/agent`).
 
 **Supported Node**: the package declares `engines.node >= 20`, and CI runs a fresh
 consumer install on that floor every build — the floor is executed, not just claimed.
