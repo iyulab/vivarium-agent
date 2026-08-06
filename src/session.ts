@@ -30,6 +30,39 @@ import type { AgentHarnessOptions, ProposeRequest, ProposeResult } from "./harne
 import type { EditContextInput, SchemaInput, DataInput } from "./ports.ts";
 import type { PriorProposalContext } from "./strategy.ts";
 
+/**
+ * Which call-order rule a session refused, as a value rather than a sentence.
+ *
+ * The set is closed and small on purpose: a session has exactly one ordering
+ * rule (propose opens it, refine continues it), so there are two ways to get
+ * it wrong and no third is coming. That is what makes a closed set the right
+ * shape here — the alternative, a code that travels over a wire, buys
+ * serializability this API never crosses.
+ */
+export type SessionCallOrderReason = "session-already-started" | "no-prior-turn";
+
+/**
+ * A call the session refused because of when it arrived, not what it carried.
+ *
+ * Both cases are the caller's to fix, and which fix applies is decided by a
+ * single number the session already holds — how many turns it has. Carrying
+ * that number is the point: without it a host recovers the session's state by
+ * matching on the message text, which is the failure this type exists to
+ * remove rather than reword.
+ */
+export class SessionCallOrderError extends Error {
+  readonly reason: SessionCallOrderReason;
+  /** Turns the session held when the call arrived. 0 means only propose() is legal. */
+  readonly turnCount: number;
+
+  constructor(reason: SessionCallOrderReason, turnCount: number, message: string) {
+    super(message);
+    this.name = "SessionCallOrderError";
+    this.reason = reason;
+    this.turnCount = turnCount;
+  }
+}
+
 export interface ProposalSessionOptions extends AgentHarnessOptions {
   /** Stable session identifier used in lineage refs. Default: random UUID. */
   sessionId?: string;
@@ -192,7 +225,11 @@ export function createProposalSession(options: ProposalSessionOptions): Proposal
   return {
     async propose(request: ProposeRequest): Promise<ProposeResult> {
       if (turns.length > 0) {
-        throw new Error("propose() starts a session and can run only once — use refine() for subsequent turns");
+        throw new SessionCallOrderError(
+          "session-already-started",
+          turns.length,
+          "propose() starts a session and can run only once — use refine() for subsequent turns",
+        );
       }
       artifacts = { ...(request.artifacts ?? {}) };
       baseArtifacts = { ...(request.baseArtifacts ?? request.artifacts ?? {}) };
@@ -204,7 +241,11 @@ export function createProposalSession(options: ProposalSessionOptions): Proposal
 
     async refine(instruction: string, overrides?: RefineOverrides): Promise<ProposeResult> {
       if (turns.length === 0) {
-        throw new Error("refine() requires a prior turn — call propose() first");
+        throw new SessionCallOrderError(
+          "no-prior-turn",
+          0,
+          "refine() requires a prior turn — call propose() first",
+        );
       }
       if (overrides && "editContext" in overrides) {
         editContext = overrides.editContext ?? null;

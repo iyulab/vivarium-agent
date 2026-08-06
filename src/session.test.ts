@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validate, verifyFingerprint, artifactFingerprint } from "@vivariumjs/changeset";
-import { createProposalSession } from "./session.ts";
+import { createProposalSession, SessionCallOrderError } from "./session.ts";
 import type { ModelRequest } from "./ports.ts";
 
 const BASE = "export default function mount() {}";
@@ -229,14 +229,33 @@ test("verified-diff surgical turn projects correctly and does not crash the next
   assert.equal(session.artifacts()["screen-main"], V3, "shared state advanced through the verified-diff turn");
 });
 
-test("session misuse fails loudly", async () => {
+test("a call in the wrong order says so structurally, not only in prose", async () => {
   const scripted = sessionProvider([payload(CONTENT_A, "Bigger.")]);
   const session = createProposalSession({ provider: scripted.provider, clock: FIXED_CLOCK });
 
-  await assert.rejects(() => session.refine("먼저 refine"), /propose\(\) first/);
-  await session.propose({ intent: "크게", artifacts: { "screen-main": BASE } });
-  await assert.rejects(
-    () => session.propose({ intent: "다시", artifacts: {} }),
-    /only once/,
+  // Both failures are the caller's to fix, and which fix applies is decided
+  // by one number the session already knows: how many turns it holds. A
+  // caller that has to read that out of a sentence is parsing prose to
+  // recover state the library could simply hand over.
+  const early = await session.refine("refine first").then(
+    () => null,
+    (err: unknown) => err,
   );
+  assert.ok(early instanceof SessionCallOrderError, "refine before propose is a call-order failure");
+  assert.equal(early.reason, "no-prior-turn");
+  assert.equal(early.turnCount, 0, "turnCount is what tells the caller to call propose()");
+
+  await session.propose({ intent: "크게", artifacts: { "screen-main": BASE } });
+
+  const late = await session.propose({ intent: "다시", artifacts: {} }).then(
+    () => null,
+    (err: unknown) => err,
+  );
+  assert.ok(late instanceof SessionCallOrderError, "a second propose is a call-order failure");
+  assert.equal(late.reason, "session-already-started");
+  assert.equal(late.turnCount, 1, "turnCount is what tells the caller to call refine()");
+
+  // The prose stays — the structure is what a host branches on, not a
+  // replacement for a message a person still has to read.
+  assert.match(late.message, /only once/);
 });

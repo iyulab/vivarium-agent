@@ -28,12 +28,13 @@ export type {
   PriorProposalContext,
 } from "./strategy.ts";
 
-export { createProposalSession } from "./session.ts";
+export { createProposalSession, SessionCallOrderError } from "./session.ts";
 export type {
   ProposalSession,
   ProposalSessionOptions,
   SessionTurnRecord,
   RefineOverrides,
+  SessionCallOrderReason,
 } from "./session.ts";
 
 export { createPlanThenGenerateStrategy, fenceUntrusted } from "./strategies/plan-then-generate.ts";

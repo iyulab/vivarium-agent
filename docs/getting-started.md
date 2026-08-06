@@ -421,6 +421,35 @@ accumulates, because a projection is something the session can compute and a
 live backend's state is not. Re-base with `{ schema }` after you apply, or
 let the turn carry the `field.add` with it.
 
+### A call in the wrong order
+
+A session has one ordering rule — `propose` opens it, `refine` continues it —
+so there are two ways to get it wrong, and both are yours to fix. Which fix
+applies is decided by a single number the session already holds:
+
+```ts
+import { SessionCallOrderError } from "@vivariumjs/agent";
+import type { ProposalSession } from "@vivariumjs/agent";
+
+async function continueOrStart(session: ProposalSession, instruction: string) {
+  try {
+    return await session.refine(instruction);
+  } catch (err) {
+    if (!(err instanceof SessionCallOrderError)) throw err;
+    if (err.reason === "no-prior-turn") {
+      // err.turnCount === 0 — there is nothing to refine yet
+      return await session.propose({ intent: instruction, artifacts: {} });
+    }
+    throw err;
+  }
+}
+```
+
+`reason` is `"no-prior-turn"` or `"session-already-started"`, and `turnCount`
+is how many turns the session held when the call arrived — `0` means only
+`propose` is legal. The message still reads as prose for a person; the fields
+are there so a host does not have to match on it.
+
 ## 5. Knowledge sources
 
 Knowledge (primitive catalogs, schema conventions, house rules) is data
