@@ -22,7 +22,11 @@
  *    hosts that are doing nothing incorrect.
  * 2. **Judged against the world the document PRODUCES, not the one it started
  *    from.** Operations are folded in order, so creating an entity and then
- *    extending it is coherent rather than self-contradictory.
+ *    extending it is coherent rather than self-contradictory. What the document
+ *    removes is remembered as retiring, not forgotten: removing a field says
+ *    nothing about the values rows already hold, so clearing them — or deleting
+ *    the rows of a removed entity — belongs in the same change and is a
+ *    legitimate target. Writing a value into what is going away is not.
  *
  * A malformed operation is not this module's business — it is reported by the
  * validator that owns shape. Anything unrecognizable here is skipped rather
@@ -32,8 +36,19 @@
 
 import type { SchemaInput, DataInput } from "../ports.ts";
 
-/** The projected schema: entity name → declared field names, in document order. */
+/** Entity name → declared field names, in document order. */
 type Projection = Map<string, Set<string>>;
+
+/**
+ * The schema the document produces, plus what it retires on the way: fields
+ * removed from a surviving entity, and removed entities with the fields they
+ * had. The data facet is judged against both.
+ */
+export interface ProjectedSchema {
+  entities: Projection;
+  retiredFields: Map<string, Set<string>>;
+  retiredEntities: Projection;
+}
 
 function project(schema: SchemaInput): Projection {
   const entities: Projection = new Map();
@@ -110,8 +125,10 @@ function fieldNameOf(op: Record<string, unknown>): unknown {
  * whose target does not exist in the world as of that point. Returns the
  * projected schema so the data facet can be judged against the same world.
  */
-export function projectSchemaOps(schema: SchemaInput, ops: Array<Record<string, unknown>>): Projection {
+export function projectSchemaOps(schema: SchemaInput, ops: Array<Record<string, unknown>>): ProjectedSchema {
   const entities = project(schema);
+  const retiredFields = new Map<string, Set<string>>();
+  const retiredEntities: Projection = new Map();
   for (const op of ops) {
     if (op === null || typeof op !== "object") continue;
     const kind = str(op.op);
@@ -150,8 +167,10 @@ export function projectSchemaOps(schema: SchemaInput, ops: Array<Record<string, 
         break;
       }
       case "entity.remove": {
-        requireEntity(entities, entity, "entity.remove");
+        const fields = requireEntity(entities, entity, "entity.remove");
         entities.delete(entity);
+        retiredEntities.set(entity, new Set([...fields, ...(retiredFields.get(entity) ?? [])]));
+        retiredFields.delete(entity);
         break;
       }
       case "field.add": {
@@ -182,6 +201,8 @@ export function projectSchemaOps(schema: SchemaInput, ops: Array<Record<string, 
         const field = str(op.field);
         if (field === null) break;
         fields.delete(requireField(fields, entity, field, "field.remove"));
+        if (!retiredFields.has(entity)) retiredFields.set(entity, new Set());
+        retiredFields.get(entity)!.add(field);
         break;
       }
       case "constraint.add":
@@ -202,7 +223,7 @@ export function projectSchemaOps(schema: SchemaInput, ops: Array<Record<string, 
         break; // unknown op — the validator refuses it, this module does not guess
     }
   }
-  return entities;
+  return { entities, retiredFields, retiredEntities };
 }
 
 /** Spec §5.3 vocabulary. Anything else is the validator's to refuse. */
@@ -217,22 +238,28 @@ interface DataOperation {
 }
 
 function checkWrittenFields(
-  entities: Projection | null,
+  fields: Set<string> | null,
+  retired: Set<string>,
   entity: string,
   written: unknown,
   op: string,
   member: string,
 ): void {
-  if (!entities || written === null || typeof written !== "object" || Array.isArray(written)) return;
-  const fields = entities.get(entity);
-  if (!fields) return;
-  for (const name of Object.keys(written)) {
-    if (!fields.has(name)) {
+  if (!fields || written === null || typeof written !== "object" || Array.isArray(written)) return;
+  for (const [name, value] of Object.entries(written)) {
+    if (fields.has(name)) continue;
+    if (retired.has(name)) {
+      // Clearing a retiring field is the one write that means something.
+      if (member === "set" && value === null) continue;
       refuse(
-        `${op} writes "${name}" on entity "${entity}" in \`${member}\`, which the schema does not declare — ` +
-          `declared fields: ${[...fields].join(", ") || "(none)"}. Add it with field.add in the same changeset, or use a declared field.`,
+        `${op} writes a value into "${name}" on entity "${entity}" in \`${member}\`, but this changeset removes that ` +
+          `field — only clearing it (null) is meaningful alongside field.remove.`,
       );
     }
+    refuse(
+      `${op} writes "${name}" on entity "${entity}" in \`${member}\`, which the schema does not declare — ` +
+        `declared fields: ${[...fields].join(", ") || "(none)"}. Add it with field.add in the same changeset, or use a declared field.`,
+    );
   }
 }
 
@@ -245,7 +272,7 @@ function checkWrittenFields(
  * questions and a host may reasonably supply one and not the other.
  */
 export function checkDataOperations(
-  entities: Projection | null,
+  schema: ProjectedSchema | null,
   rows: DataInput | null,
   patches: Array<{ operations?: unknown }>,
 ): void {
@@ -262,17 +289,37 @@ export function checkDataOperations(
       // members here would answer a question nobody asked — reporting an
       // unreadable `where` when the real fault is that `upsert` does not exist.
       if (!DATA_OPS.has(kind)) continue;
-      if (entities && !entities.has(entity)) {
-        refuse(
-          `data operation "${kind}" targets entity "${entity}", which does not exist in the live schema — ` +
-            `existing entities: ${known(entities)}.`,
-        );
+      // `fields` is what a write may name; `selectable` adds what the document
+      // retires, since rows can still be picked out by a value that is going away.
+      let fields: Set<string> | null = null;
+      let retired = new Set<string>();
+      if (schema) {
+        const declared = schema.entities.get(entity);
+        const removed = schema.retiredEntities.get(entity);
+        if (declared) {
+          fields = declared;
+          retired = schema.retiredFields.get(entity) ?? retired;
+        } else if (removed) {
+          if (kind !== "delete") {
+            refuse(
+              `data ${kind} targets entity "${entity}", but this changeset removes that entity — ` +
+                `only deleting its rows is meaningful alongside entity.remove.`,
+            );
+          }
+          fields = new Set();
+          retired = removed;
+        } else {
+          refuse(
+            `data operation "${kind}" targets entity "${entity}", which does not exist in the live schema — ` +
+              `existing entities: ${known(schema.entities)}.`,
+          );
+        }
       }
       if (kind === "insert") {
-        checkWrittenFields(entities, entity, operation.values, `data insert`, "values");
+        checkWrittenFields(fields, retired, entity, operation.values, `data insert`, "values");
         continue;
       }
-      checkWrittenFields(entities, entity, operation.set, `data ${kind}`, "set");
+      checkWrittenFields(fields, retired, entity, operation.set, `data ${kind}`, "set");
       const where = operation.where;
       if (where === undefined) continue; // absent `where` is the validator's finding
       // A `where` this check cannot READ is an input failure of the check, and
@@ -293,14 +340,11 @@ export function checkDataOperations(
         );
       }
       const equals = (where as { equals?: unknown }).equals;
-      if (entities) {
-        const fields = entities.get(entity);
-        if (fields && !fields.has(field)) {
-          refuse(
-            `data ${kind} selects rows of "${entity}" by field "${field}", which the schema does not declare — ` +
-              `declared fields: ${[...fields].join(", ") || "(none)"}.`,
-          );
-        }
+      if (fields && !fields.has(field) && !retired.has(field)) {
+        refuse(
+          `data ${kind} selects rows of "${entity}" by field "${field}", which the schema does not declare — ` +
+            `declared fields: ${[...fields].join(", ") || "(none)"}.`,
+        );
       }
       // Row-level judgment needs the rows. An entity absent from the supplied
       // data facet is not evidence of anything: a host may show the model only

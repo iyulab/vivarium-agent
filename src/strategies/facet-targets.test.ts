@@ -229,6 +229,69 @@ test("insert values are checked against the schema, and a field added in the sam
   assert.equal(result.outcome.retries.length, 0);
 });
 
+test("clearing the values of a field the same document removes is a legitimate target", async () => {
+  // Removing a field says nothing about the values rows already hold, so a
+  // change that retires a field and its values carries both. The data patch is
+  // judged after the removal — and must still be allowed to clear what goes.
+  const retire = JSON.stringify({
+    schemaOps: [{ op: "field.remove", entity: "item", field: "name", explanation: "Retire the name." }],
+    dataPatches: [
+      {
+        id: "p1",
+        explanation: "Clear the retired values.",
+        operations: [{ op: "update", entity: "item", where: { field: "name", equals: "Bolt" }, set: { name: null } }],
+      },
+    ],
+  });
+  const { result } = await proposeWith([retire], withFacets);
+
+  assert.ok(result.proposal, "clearing a field this document removes is coherent, not a stray write");
+  assert.equal(result.outcome.retries.length, 0);
+});
+
+test("writing a value into a field the same document removes is refused — only clearing it means anything", async () => {
+  const bad = JSON.stringify({
+    schemaOps: [{ op: "field.remove", entity: "item", field: "name", explanation: "Retire the name." }],
+    dataPatches: [
+      {
+        id: "p1",
+        explanation: "x",
+        operations: [{ op: "update", entity: "item", where: { field: "id", equals: "sku-1" }, set: { name: "Nut" } }],
+      },
+    ],
+  });
+  const { result } = await proposeWith([bad, UI_ONLY], withFacets);
+
+  assert.ok(result.proposal);
+  assert.match(result.outcome.retries[0].errors.join(" "), /removes/);
+});
+
+test("deleting the rows of an entity the same document removes is a legitimate target; inserting into it is not", async () => {
+  const retire = JSON.stringify({
+    schemaOps: [{ op: "entity.remove", entity: "item", explanation: "Retire items." }],
+    dataPatches: [
+      {
+        id: "p1",
+        explanation: "Delete the retired rows.",
+        operations: [{ op: "delete", entity: "item", where: { field: "id", equals: "sku-1" } }],
+      },
+    ],
+  });
+  const kept = await proposeWith([retire], withFacets);
+  assert.ok(kept.result.proposal, "retiring an entity's rows with it is coherent");
+  assert.equal(kept.result.outcome.retries.length, 0);
+
+  const insert = JSON.stringify({
+    schemaOps: [{ op: "entity.remove", entity: "item", explanation: "Retire items." }],
+    dataPatches: [
+      { id: "p1", explanation: "x", operations: [{ op: "insert", entity: "item", values: { id: "sku-2" } }] },
+    ],
+  });
+  const refused = await proposeWith([insert, UI_ONLY], withFacets);
+  assert.ok(refused.result.proposal);
+  assert.match(refused.result.outcome.retries[0].errors.join(" "), /removes/);
+});
+
 test("an insert naming a field nothing declares is refused", async () => {
   const bad = JSON.stringify({
     dataPatches: [

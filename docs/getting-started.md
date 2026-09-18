@@ -359,7 +359,11 @@ Two bounds are worth relying on:
   real row — the rows were never shown.
 - **Judged against the world the changeset produces.** Creating an entity and
   then adding a field to it in the same document is coherent, not
-  contradictory, so it is not refused.
+  contradictory, so it is not refused. Removing is remembered as retiring:
+  removing a field does not say what happens to the values rows already hold,
+  so clearing them (`set` to `null`) — or deleting the rows of an entity the
+  document removes — is a valid target in the same changeset. Writing a value
+  into what the document removes is refused.
 
 ## 4. Sessions: refinement with lineage
 
