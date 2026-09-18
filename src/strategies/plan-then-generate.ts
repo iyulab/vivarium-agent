@@ -120,16 +120,19 @@ function extractJson(text: string): GeneratedPayload {
  */
 function facetSections(input: StrategyInput): string[] {
   const sections: string[] = [];
+  // A facet's `base` identity is for the document, not the model: it names
+  // nothing an operation can target, and leaving it out keeps the prompt the
+  // same whether or not the consumer supplied it.
   if (input.schema) {
     sections.push(
       `SCHEMA (live) — the state schema operations are authored against:\n` +
-        fenceUntrusted("live schema facet", JSON.stringify(input.schema, null, 2)),
+        fenceUntrusted("live schema facet", JSON.stringify({ entities: input.schema.entities }, null, 2)),
     );
   }
   if (input.data) {
     sections.push(
       `DATA (live) — the rows a data operation's \`where\` can select:\n` +
-        fenceUntrusted("live data facet", JSON.stringify(input.data, null, 2)),
+        fenceUntrusted("live data facet", JSON.stringify({ entities: input.data.entities }, null, 2)),
     );
   }
   return sections;
@@ -326,6 +329,18 @@ export function createPlanThenGenerateStrategy(): ProposalStrategy {
                 ref: id,
                 fingerprint: artifactFingerprint(content),
               })),
+              // Schema and data bases, for the facets this document changes
+              // (spec §4: a changeset with data patches SHOULD declare its data
+              // base). Declaring an untouched data facet would make every
+              // unrelated row change drift this proposal — the facet is
+              // fingerprinted whole (spec O-4). The SDK lifts specVersion to
+              // 0.3.0 for a data entry.
+              ...((payload.schemaOps ?? []).length > 0 && input.schema?.base
+                ? [{ kind: "schema", ref: input.schema.base.ref, fingerprint: input.schema.base.fingerprint }]
+                : []),
+              ...((payload.dataPatches ?? []).length > 0 && input.data?.base
+                ? [{ kind: "data", ref: input.data.base.ref, fingerprint: input.data.base.fingerprint }]
+                : []),
               // Refinement lineage: the world authored against includes the
               // prior (not-yet-released) changeset (spec §4 baseState).
               ...(input.prior

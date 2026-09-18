@@ -14,6 +14,7 @@ export type {
   KnowledgeQuery,
   EditContextInput,
   SchemaInput,
+  FacetBase,
   DataInput,
 } from "./ports.ts";
 

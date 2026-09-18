@@ -254,7 +254,7 @@ Both shapes speak the changeset spec's own vocabulary (§5.1 logical schema
 operations, §5.3 data operations), so they are the same view for every host
 — producing them from your backend is your adapter's job.
 
-Three things worth knowing:
+Four things worth knowing:
 
 - **What you supplied is recorded.** `provenance.facetsSeen` lists the facets
   that reached the prompts (`[]` when none did). It is not the changeset's
@@ -270,6 +270,19 @@ Three things worth knowing:
   sees. Trimming a large data facet is your call, made where the cost is
   known — silently showing the model a subset would recreate the exact
   problem this input solves: a `where` written against rows it never saw.
+- **Say what state the view is, and a stale proposal is refused.** Each
+  view takes an optional `base: { ref, fingerprint }` — the identity your
+  adapter reports for that facet (`schema: { base, entities }`, likewise
+  `data`). When the changeset changes that facet, the harness declares the
+  base in `provenance.baseState` (`kind: "schema"` / `"data"`; a data entry
+  stamps spec 0.3.0), so an applier's drift gate refuses the proposal once the
+  live facet has moved. The harness computes `ui-artifact` fingerprints itself
+  because the spec defines them; schema and data fingerprints are
+  adapter-defined, so it never invents one — without `base` the facet is
+  simply undeclared, and an undeclared facet is an unchecked one. A facet the
+  changeset does not change is not declared: the data facet is fingerprinted
+  as a whole, so declaring it on a UI-only change would refuse that change
+  whenever any row moved. The base never enters a prompt.
 
 Schema and data enter the prompts inside the same labeled untrusted fences
 screen content does (§6) — field names and row values are authored outside

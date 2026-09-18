@@ -35,6 +35,28 @@ export interface KnowledgeSource {
 }
 
 /**
+ * The live identity of a schema or data facet — the `ref` and `fingerprint` a
+ * changeset's `provenance.baseState` entry carries (spec §4).
+ *
+ * The harness cannot derive these. A `ui-artifact` fingerprint is defined by
+ * the spec (SHA-256 over the content bytes), so the harness computes it from
+ * the artifact it was given; a schema or data fingerprint is adapter-defined —
+ * how it is computed and what `ref` names belong to the backend, and only the
+ * consumer holding that adapter can say it. Without it the facet is
+ * undeclared, and an undeclared facet is an unchecked one: its live state can
+ * move under the proposal and the drift gate has nothing to compare.
+ *
+ * It lives on the view it identifies rather than beside it, so the two are
+ * replaced together — a re-based view carrying the old fingerprint would
+ * declare a state the proposal was not authored against.
+ */
+export interface FacetBase {
+  ref: string;
+  /** `sha256:`-prefixed, as the adapter reports it. */
+  fingerprint: string;
+}
+
+/**
  * Agent-side structural view of the LIVE schema facet, in the changeset
  * spec's own logical vocabulary (§5.1 — entities, fields, logical types).
  *
@@ -45,6 +67,13 @@ export interface KnowledgeSource {
  * is the spec's vocabulary, so it is the same view for every consumer.
  */
 export interface SchemaInput {
+  /**
+   * This view's identity as the consumer's adapter reports it. Supply it and a
+   * changeset that carries schema operations declares it in
+   * `provenance.baseState`, so a drift-detecting applier refuses the proposal
+   * once the live schema has moved. See {@link FacetBase}.
+   */
+  base?: FacetBase | null;
   entities: Array<{
     name: string;
     /**
@@ -68,6 +97,12 @@ export interface SchemaInput {
  * see is the consumer's call, made where the cost is known.
  */
 export interface DataInput {
+  /**
+   * This view's identity as the consumer's adapter reports it. Supply it and a
+   * changeset that carries data patches declares it in `provenance.baseState`
+   * (`kind: "data"`, spec 0.3). See {@link FacetBase}.
+   */
+  base?: FacetBase | null;
   /** Rows keyed by entity name, matching `SchemaInput.entities[].name`. */
   entities: Record<string, Array<Record<string, unknown>>>;
 }
