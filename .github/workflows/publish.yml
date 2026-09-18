@@ -30,16 +30,33 @@ jobs:
           echo "version=$v" >> "$GITHUB_OUTPUT"
       - run: npm ci
       - run: npm test
-      - run: npm publish --access public --provenance
+      # Idempotent: rerunning this job after a failed verification must not die on
+      # "cannot publish over previously published versions".
+      - name: Publish to npm (skip if the version is already live)
+        run: |
+          if npm view "@vivariumjs/agent@${{ steps.meta.outputs.version }}" version >/dev/null 2>&1; then
+            echo "version ${{ steps.meta.outputs.version }} already on the registry — skipping publish (rerun-safe); verification below still runs"
+          else
+            npm publish --access public --provenance
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # The registry serves package metadata with a five-minute cache lifetime, so
+      # without --prefer-online the first 404 is re-served from the runner's npm
+      # cache for the whole retry window. An exhausted loop fails here with the
+      # reason instead of falling through to a module-not-found.
       - name: Verify the published package from the registry
         working-directory: ${{ runner.temp }}
         run: |
           mkdir consumer && cd consumer
           echo '{"name":"consumer","private":true,"type":"module"}' > package.json
-          for i in $(seq 1 30); do
-            npm install --no-audit --no-fund "@vivariumjs/agent@${{ steps.meta.outputs.version }}" && break
-            sleep 10
+          ok=0
+          for i in $(seq 1 40); do
+            if npm install --no-audit --no-fund --prefer-online "@vivariumjs/agent@${{ steps.meta.outputs.version }}"; then ok=1; break; fi
+            sleep 15
           done
+          if [ "$ok" != 1 ]; then
+            echo "registry did not serve @vivariumjs/agent@${{ steps.meta.outputs.version }} within the retry window (propagation lag?) — rerun this job once it is visible" >&2
+            exit 1
+          fi
           node -e "import('@vivariumjs/agent').then((m) => { if (!Object.keys(m).length) throw new Error('empty surface'); console.log('registry ok:', Object.keys(m).length, 'exports'); }).catch((e) => { console.error(e); process.exit(1); })"
