@@ -5,6 +5,64 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) ·
 versioning: 0.x — minor for surface changes, patch for fixes. The agent
 consumes the changeset contract; it never applies changesets itself.
 
+## 0.2.0 — 2026-09-18
+
+### Added
+- **A session call in the wrong order says so structurally.** `propose` opens a
+  session and `refine` continues it — so there are exactly two ways to get the order
+  wrong, and both are the caller's to fix. Until now both arrived as a plain `Error`,
+  which left a host to recover the session's state by matching on the message text.
+  `SessionCallOrderError` carries `reason` (`"no-prior-turn"` /
+  `"session-already-started"`) and `turnCount` — the one number that decides which
+  call is legal, `0` meaning only `propose` is. The messages are unchanged, so prose
+  still reads as prose; a closed set of reasons fits here rather than a numeric code
+  because the failures never cross a serialization boundary and no third case is
+  coming.
+- **`propose` and `refine` accept the live schema and data facets.** A changeset has
+  three facets, and until now the harness only accepted one of them as input: the
+  generation step was asked to emit schema and data operations while seeing nothing
+  but UI artifact content. It could not name an entity, could not tell whether a field
+  already existed, and could not identify a row for a `where` clause — so it either
+  invented identifiers or dropped those facets and shipped a UI-only change that read
+  as complete. `SchemaInput` and `DataInput` speak the changeset specification's own
+  vocabulary (§5.1 logical schema operations, §5.3 data operations), so the view is
+  the same for every host. Both are optional and absent means the previous behavior,
+  byte for byte: a UI-only host is unaffected.
+- **The generation prompt states the operation vocabulary it asks for.** Naming a
+  facet without naming its operation shape left the model to guess members the
+  specification closes — including the asymmetry that a schema operation carries its
+  own `explanation` while a data patch carries one per patch.
+- **Author-time target checking.** An operation naming an entity, field or row that
+  does not exist used to pass validation, seal into the fingerprint, clear the approval
+  gate, and surface inside a backend write path — the latest and most expensive place
+  for it to fail. When the facets are supplied, the harness now refuses it at authoring
+  time, as a retryable error naming both the missing target and the existing ones. The
+  refusal is bounded twice: it judges only the facets it was given the state to judge,
+  and it judges against the world the changeset *produces*, so creating an entity and
+  extending it in the same document is coherent rather than contradictory. Supplying
+  nothing keeps the previous behavior.
+- **A proposal declares the schema and data bases it changes, when the host names
+  them.** `SchemaInput` and `DataInput` take an optional `base: { ref, fingerprint }`
+  — the facet's identity as the host's adapter reports it. When the changeset carries
+  schema operations or data patches, that base goes into `provenance.baseState`
+  (`kind: "schema"` / `"data"`; a data entry stamps spec 0.3.0), so a drift-detecting
+  applier refuses the proposal once the live facet has moved. Until now even a
+  three-facet proposal declared only its UI artifacts, and a stale proposal applied
+  over a schema or rows that had changed under it. The harness does not compute these
+  fingerprints — the specification leaves them to the adapter — and does not declare a
+  facet the changeset leaves alone, since a whole-facet data fingerprint would then
+  refuse unrelated changes. The base is kept out of the prompts.
+- **`provenance.facetsSeen`** — which live facets reached the prompts. A proposal that
+  touches no data reads differently depending on whether the rows were visible; nothing
+  else in the document distinguishes a considered choice from a blind spot. Distinct
+  from the changeset's `provenance.baseState`, which declares a fingerprinted state a
+  drift gate checks.
+
+### Changed
+- **Depends on `@vivariumjs/changeset` `^0.3.0`** (was `^0.2.0`). A proposal that declares a
+  data base carries `baseState.kind: "data"`, which is 0.3 vocabulary; the SDK stamps the
+  document's `specVersion` accordingly.
+
 ## 0.1.1 — 2026-07-19
 
 ### Fixed
