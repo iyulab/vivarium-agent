@@ -5,6 +5,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) ·
 versioning: 0.x — minor for surface changes, patch for fixes. The agent
 consumes the changeset contract; it never applies changesets itself.
 
+## 0.2.1 — 2026-09-19
+
+### Fixed
+- **A changeset can clear what it removes.** With the live schema supplied, data operations were judged
+  against the schema after the document's own `field.remove`, so clearing the removed field's values was
+  refused as a write to an undeclared field — a change retiring a field together with its values could not
+  be authored. Removal is now treated as retiring: setting a removed field to `null`, selecting rows by it,
+  and deleting the rows of a removed entity are valid targets. Writing a value into a removed field, or
+  inserting into a removed entity, is still refused.
+
+### CI
+- **Publish workflow** is rerun-safe and its registry check is conclusive: the publish step skips a version that is
+  already live, the verification retries with `--prefer-online` (the registry's metadata cache otherwise re-serves the
+  first 404 for its five-minute lifetime) over a ~10-minute window, and an exhausted window fails with the reason.
+
 ## 0.2.0 — 2026-09-18
 
 ### Added
