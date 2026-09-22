@@ -249,11 +249,15 @@ function checkWrittenFields(
   for (const [name, value] of Object.entries(written)) {
     if (fields.has(name)) continue;
     if (retired.has(name)) {
-      // Clearing a retiring field is the one write that means something.
+      // Spec §5.4 orders removals after this document's data operations, so a write to
+      // a field on its way out is well-formed — it just cannot survive. Clearing to
+      // null is permitted and redundant (the removal takes the values either way), and
+      // writing a real value is work the same document then discards.
       if (member === "set" && value === null) continue;
       refuse(
         `${op} writes a value into "${name}" on entity "${entity}" in \`${member}\`, but this changeset removes that ` +
-          `field — only clearing it (null) is meaningful alongside field.remove.`,
+          `field — the removal applies after these data operations (changeset spec §5.4) and takes the values with it, ` +
+          `so the write cannot survive. Drop it, or keep the field.`,
       );
     }
     refuse(
