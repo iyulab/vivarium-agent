@@ -108,14 +108,34 @@ export interface DataInput {
 }
 
 /**
- * Agent-side structural view of the edit-context contract v0.1
+ * Agent-side structural view of the edit-context contract v0.2
  * (produced by the vivarium runtime; consumed here).
+ *
+ * 0.2 replaced a flat list of every addressable element on the screen with the
+ * selection's neighbourhood, each entry saying how it stands to the selection and
+ * what role it carries. The old list grew with the data rather than the code — the
+ * part an editing agent is meant to change shrank against the part it is not.
+ *
+ * The accessible name is deliberately NOT here. It is screen-derived content and
+ * lives under `untrusted` with the rest of the screen's words, which is where this
+ * agent's fencing already treats it as data.
  */
+export interface ScreenElementInput {
+  id: string;
+  tag: string;
+  relation: "selected" | "ancestor" | "sibling" | "child";
+  role: string | null;
+}
+
 export interface EditContextInput {
   editContextVersion: string;
   profile: string | null;
   selection: Array<{ id: string; tag: string }>;
-  screen: { elementIds: string[] };
+  screen: { elements: ScreenElementInput[] };
   source: { language: string; code: string } | null;
-  untrusted: Record<string, { text: string | null; attributes: Record<string, string> }>;
+  untrusted: Record<string, {
+    text: string | null;
+    attributes: Record<string, string>;
+    name?: string | null;
+  }>;
 }

@@ -8,7 +8,12 @@ const EDIT_CONTEXT = {
   editContextVersion: "0.1",
   profile: "react-tsx@0",
   selection: [{ id: "viv:@panel/button[0]", tag: "button" }],
-  screen: { elementIds: ["panel", "viv:@panel/button[0]"] },
+  screen: {
+    elements: [
+      { id: "panel", tag: "div", relation: "ancestor" as const, role: null },
+      { id: "viv:@panel/button[0]", tag: "button", relation: "selected" as const, role: "button" },
+    ],
+  },
   source: { language: "tsx", code: "export default function mount() {}" },
   untrusted: {
     "viv:@panel/button[0]": {
