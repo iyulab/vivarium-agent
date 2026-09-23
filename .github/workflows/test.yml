@@ -25,7 +25,7 @@ jobs:
       # Type-check + dist build — exports point at dist/, so the consumer
       # smoke below needs it built (folder installs don't run prepack).
       - run: npm run build
-      # Consumer-contact smoke (Phase 5.a): a fresh consumer package installs
+      # Consumer-contact smoke: a fresh consumer package installs
       # this repo and imports the public surface. @vivariumjs/changeset comes
       # from the registry, so this is a true standalone consumption check.
       - name: Fresh consumer installs and imports @vivariumjs/agent
@@ -34,7 +34,7 @@ jobs:
           echo '{"name":"consumer","private":true,"type":"module"}' > package.json
           npm install --no-audit --no-fund "$GITHUB_WORKSPACE"
           node -e "import('@vivariumjs/agent').then((m) => { const n = Object.keys(m).length; if (!n) throw new Error('empty surface'); console.log('imported', n, 'exports'); }).catch((e) => { console.error(e); process.exit(1); })"
-      # Docs-example verification (Phase 5.c): the getting-started fences are
+      # Docs-example verification: the getting-started fences are
       # extracted, type-checked, and executed against the packed tarball.
       - name: Getting-started examples run as a fresh npm consumer
         run: node tools/verify-docs-examples.ts
