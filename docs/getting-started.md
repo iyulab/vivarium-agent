@@ -135,10 +135,10 @@ of what the user selected on screen:
 import type { EditContextInput } from "@vivariumjs/agent";
 
 const editContext: EditContextInput = {
-  editContextVersion: "0.1",
+  editContextVersion: "0.2",
   profile: null,
   selection: [{ id: "title", tag: "h1" }],
-  screen: { elementIds: ["title"] },
+  screen: { elements: [{ id: "title", tag: "h1", relation: "selected", role: "heading" }] },
   source: {
     language: "js",
     code: "export default function mount(root) { root.textContent = 'Home'; }",
