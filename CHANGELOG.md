@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) ·
 versioning: 0.x — minor for surface changes, patch for fixes. The agent
 consumes the changeset contract; it never applies changesets itself.
 
+## 0.3.1 — 2026-09-23
+
+### Changed
+- Depends on `@vivariumjs/changeset` ^0.5.0. No change to the agent's own API or output: documents are
+  still stamped at the spec versions they were before.
+
 ## 0.3.0 — 2026-09-23
 
 ### Changed
