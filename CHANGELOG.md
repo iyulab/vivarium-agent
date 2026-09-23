@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) ·
 versioning: 0.x — minor for surface changes, patch for fixes. The agent
 consumes the changeset contract; it never applies changesets itself.
 
+## 0.3.0 — 2026-09-23
+
+### Changed
+- **Consumes edit context 0.2**: `screen.elements` (the selection's neighbourhood, with
+  `relation` and `role`) in place of `screen.elementIds`, and an optional accessible `name`
+  on `untrusted` entries. Breaking for callers that build the input type themselves.
+- The refusal for writing a value into a field the same changeset removes now says why the
+  write cannot survive — the removal applies after the document's data operations (changeset
+  spec §5.4) and takes the values with it — instead of asserting that only a null clear is
+  "meaningful". The behaviour is unchanged; the reason it gives is now the contract's.
+
+### Dependencies
+- `@vivariumjs/changeset` ^0.4.0 (was ^0.3.0).
+
 ## 0.2.1 — 2026-09-19
 
 ### Fixed

@@ -35,7 +35,7 @@
     "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
-    "@vivariumjs/changeset": "^0.3.0"
+    "@vivariumjs/changeset": "^0.4.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
