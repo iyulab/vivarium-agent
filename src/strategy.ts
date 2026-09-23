@@ -1,8 +1,7 @@
 /**
  * Strategy port — how a proposal is produced. The v0 default is
- * plan-then-generate with a validate-retry loop (umbrella design ADR-0002),
- * but the strategy is a swappable module: this interface is the contract,
- * not the algorithm.
+ * plan-then-generate with a validate-retry loop, but the strategy is a
+ * swappable module: this interface is the contract, not the algorithm.
  *
  * State machine: intent → plan → draft → validated | exhausted. Every
  * transition is recorded so the proposal loop can expose it as shared state.

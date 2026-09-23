@@ -1,5 +1,5 @@
 /**
- * v0 default strategy (umbrella design ADR-0002): plan-then-generate with a
+ * v0 default strategy: plan-then-generate with a
  * deterministic validate-retry loop. The validator is the changeset SDK,
  * not a model — the agent structurally cannot emit a non-conforming
  * changeset (validation failure exhausts into "no output").
