@@ -20,7 +20,7 @@ export interface ModelProvider {
 
 export interface KnowledgeQuery {
   intent: string;
-  /** The edit context the user is pointing with (see vivarium docs/edit-context.md). */
+  /** The edit context the user is pointing with (see https://github.com/iyulab/vivarium/blob/main/docs/edit-context.md). */
   editContext: EditContextInput | null;
 }
 

@@ -5,7 +5,7 @@
  * changeset (validation failure exhausts into "no output").
  *
  * Injection defense: this strategy is a consumer of the edit-context
- * contract (vivarium docs/edit-context.md §3). Screen-derived content and
+ * contract (https://github.com/iyulab/vivarium/blob/main/docs/edit-context.md §3). Screen-derived content and
  * artifact sources enter prompts only inside labeled untrusted fences; the
  * fence token is chosen so it cannot occur inside the fenced content.
  */
