@@ -81,7 +81,7 @@ test("field.add on an entity that does not exist is refused, and the reason name
   const errors = result.outcome.retries[0].errors.join(" ");
   assert.match(errors, /invoice/, "the refusal names the entity that does not exist");
   assert.match(errors, /item/, "and names what does exist, so the retry is actionable");
-  assert.match(scripted.requests.at(-1).user, /invoice/, "the reason reaches the model");
+  assert.match(scripted.requests.at(-1)!.user, /invoice/, "the reason reaches the model");
 });
 
 test("field.remove of a field the entity does not have is refused", async () => {

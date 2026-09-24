@@ -105,6 +105,7 @@ test("validate-retry loop: spec errors are fed back and recovered from", async (
   assert.match(result.outcome.retries[0].errors.join(" "), /explanation/);
   // The retry prompt must carry the validation errors back to the model.
   const retryPrompt = scripted.requests.at(-1);
+  assert.ok(retryPrompt);
   assert.match(retryPrompt.user, /FAILED VALIDATION/);
   assert.match(retryPrompt.user, /explanation/);
 });
@@ -166,6 +167,7 @@ test("no-op generation is retried with a pointed error, then validated when the 
   assert.equal(result.proposal.provenance.attempts, 2);
   assert.match(result.outcome.retries[0].errors.join(" "), /no-op output/);
   const retryPrompt = scripted.requests.at(-1);
+  assert.ok(retryPrompt);
   assert.match(retryPrompt.user, /no-op output/, "retry tells the model nothing changed");
 });
 

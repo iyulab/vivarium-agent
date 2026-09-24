@@ -96,6 +96,7 @@ test("the generator prompt carries the live schema — the facet it must emit op
 
   assert.ok(result.proposal, "three-facet payload must validate");
   const generatePrompt = scripted.requests.at(-1);
+  assert.ok(generatePrompt);
   assert.match(generatePrompt.user, /SCHEMA \(live\)/);
   assert.ok(generatePrompt.user.includes('"restockAt"') === false, "schema shows what exists, not what is proposed");
   assert.ok(generatePrompt.user.includes('"quantity"'), "existing field names reach the generator");
@@ -114,6 +115,7 @@ test("the generator prompt carries live data rows — a `where` needs an identif
   });
 
   const generatePrompt = scripted.requests.at(-1);
+  assert.ok(generatePrompt);
   assert.match(generatePrompt.user, /DATA \(live\)/);
   assert.ok(generatePrompt.user.includes("sku-2"), "row identifiers reach the generator — inventing them is the defect");
 });
@@ -188,7 +190,7 @@ test("the generator is told the operation vocabulary it is asked to emit", async
     data: DATA,
   });
 
-  const system = scripted.requests.at(-1).system;
+  const system = scripted.requests.at(-1)!.system;
   assert.match(system, /field\.add/, "schema op vocabulary named");
   assert.match(system, /entity\.create/);
   assert.match(system, /"where"/, "data op required members named");
@@ -228,6 +230,7 @@ test("an empty schema is still a fact — 'no entities' is not the same as 'unkn
   });
 
   const generatePrompt = scripted.requests.at(-1);
+  assert.ok(generatePrompt);
   assert.match(generatePrompt.user, /SCHEMA \(live\)/, "a declared-but-empty schema is reported, not dropped");
 });
 
@@ -264,6 +267,7 @@ test("a session keeps the facets across refine turns, and a re-base can move the
   await session.refine("수량도 보여줘", { data: movedData });
 
   const lastGenerate = requests.filter((r) => r.system.startsWith("You are a changeset generator")).at(-1);
+  assert.ok(lastGenerate);
   assert.ok(lastGenerate.user.includes("sku-9"), "the re-based data facet reaches the refine turn");
   assert.ok(!lastGenerate.user.includes("sku-1"), "the stale rows are gone — a re-base replaces, never merges");
   assert.ok(lastGenerate.user.includes('"quantity"'), "the schema stays sticky when only data was re-based");
@@ -281,18 +285,21 @@ test("provenance records which facets the model was shown (fixed principle 3)", 
     provider: scriptedProvider([uiOnly]).provider,
     clock: FIXED_CLOCK,
   }).propose({ intent: "x", artifacts: { "screen-main": "base" }, schema: SCHEMA, data: DATA });
+  assert.ok(withBoth.proposal);
   assert.deepEqual(withBoth.proposal.provenance.facetsSeen, ["schema", "data"]);
 
   const schemaOnly = await createAgentHarness({
     provider: scriptedProvider([uiOnly]).provider,
     clock: FIXED_CLOCK,
   }).propose({ intent: "x", artifacts: { "screen-main": "base" }, schema: SCHEMA });
+  assert.ok(schemaOnly.proposal);
   assert.deepEqual(schemaOnly.proposal.provenance.facetsSeen, ["schema"]);
 
   const neither = await createAgentHarness({
     provider: scriptedProvider([uiOnly]).provider,
     clock: FIXED_CLOCK,
   }).propose({ intent: "x", artifacts: { "screen-main": "base" } });
+  assert.ok(neither.proposal);
   assert.deepEqual(neither.proposal.provenance.facetsSeen, [], "empty, not absent — the field is always there");
 });
 
@@ -314,13 +321,16 @@ test("a session's refine turn reports the facets that turn actually saw", async 
     artifacts: { "screen-main": "base" },
     schema: SCHEMA,
   });
+  assert.ok(first.proposal);
   assert.deepEqual(first.proposal.provenance.facetsSeen, ["schema"]);
 
   // Sticky: the turn did not re-supply the schema, but it was still shown.
   const second = await session.refine("more");
+  assert.ok(second.proposal);
   assert.deepEqual(second.proposal.provenance.facetsSeen, ["schema"]);
 
   // Cleared explicitly — a different instruction from omitting the key.
   const third = await session.refine("more", { schema: null });
+  assert.ok(third.proposal);
   assert.deepEqual(third.proposal.provenance.facetsSeen, []);
 });

@@ -246,7 +246,7 @@ test("the generation prompt states these shapes — the tests and the instructio
     data: DATA,
   });
 
-  const system = rig.requests.at(-1).system;
+  const system = rig.requests.at(-1)!.system;
   for (const op of Object.keys(SCHEMA_OP_MEMBERS)) {
     assert.ok(system.includes(op), `the prompt must name the schema operation "${op}"`);
   }
