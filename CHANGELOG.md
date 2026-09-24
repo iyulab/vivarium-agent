@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) ·
 versioning: 0.x — minor for surface changes, patch for fixes. The agent
 consumes the changeset contract; it never applies changesets itself.
 
+## 0.4.1 — 2026-09-24
+
+### Changed
+- The readme now says which gallery runs can be re-checked offline, and against what, instead of implying every archived run can be.
+
+### Fixed
+- Declaration comments that pointed at the edit-context contract by a repository-relative path now link to it by URL — the path did not exist in the installed package.
+
 ## 0.4.0 — 2026-09-24
 
 ### Added
