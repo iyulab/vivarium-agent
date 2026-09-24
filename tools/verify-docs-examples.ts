@@ -51,6 +51,15 @@ try {
   }));
   run("npm", ["install", "--no-audit", "--no-fund", tarball], consumer);
   writeFileSync(join(consumer, "consumer.ts"), fences.join("\n"));
+  // A reader follows the guide top to bottom, so each fence is also
+  // type-checked with only the fences before it. Checking the whole guide as
+  // one file lets an import written in a later section cover a name an
+  // earlier section uses (imports hoist).
+  const prefixes = fences.map((_, index) => {
+    const file = `through-fence-${String(index + 1).padStart(2, "0")}.ts`;
+    writeFileSync(join(consumer, file), fences.slice(0, index + 1).join("\n") + "\nexport {};\n");
+    return file;
+  });
   writeFileSync(join(consumer, "tsconfig.json"), JSON.stringify({
     compilerOptions: {
       strict: true,
@@ -60,11 +69,11 @@ try {
       moduleResolution: "bundler",
       lib: ["es2022"],
     },
-    files: ["consumer.ts"],
+    files: ["consumer.ts", ...prefixes],
   }));
   run("node", [join(repoRoot, "node_modules", "typescript", "bin", "tsc"), "-p", consumer], consumer);
   run("node", ["consumer.ts"], consumer);
-  console.log(`PASS docs — ${fences.length} fences type-checked and executed against the packed tarball`);
+  console.log(`PASS docs — ${fences.length} fences type-checked (each also with only the fences before it) and executed against the packed tarball`);
 } catch (error: any) {
   console.error(`FAIL — ${error.message}`);
   if (error.stdout) console.error(String(error.stdout));
