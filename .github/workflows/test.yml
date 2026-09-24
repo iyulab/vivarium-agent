@@ -16,8 +16,8 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
       - run: npm ci
@@ -51,7 +51,7 @@ jobs:
             echo "engines.node is '$declared' but this job runs 20; change both together" >&2
             exit 1
           fi
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
       - name: A fresh consumer imports @vivariumjs/agent on Node 20
