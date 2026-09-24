@@ -2,10 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validate, verifyFingerprint } from "@vivariumjs/changeset";
 import { createAgentHarness } from "./harness.ts";
+import { EditContextVersionError, SUPPORTED_EDIT_CONTEXT_VERSIONS } from "./edit-context.ts";
+import { createProposalSession } from "./session.ts";
 import type { ModelRequest } from "./ports.ts";
 
 const EDIT_CONTEXT = {
-  editContextVersion: "0.1",
+  editContextVersion: "0.2",
   profile: "react-tsx@0",
   selection: [{ id: "viv:@panel/button[0]", tag: "button" }],
   screen: {
@@ -215,4 +217,55 @@ test("describe() enumerates the wiring (audit surface)", () => {
     strategy: "plan-then-generate@0",
     knowledgeSources: ["conventions"],
   });
+});
+
+test("an edit context of an unsupported version is refused before the model is called", async () => {
+  for (const version of ["0.1", "0.3", "1.0", "", "0.2x"]) {
+    const scripted = scriptedProvider([VALID_PAYLOAD]);
+    const harness = createAgentHarness({ provider: scripted.provider, clock: FIXED_CLOCK });
+    await assert.rejects(
+      harness.propose({
+        intent: "make it bigger",
+        editContext: { ...EDIT_CONTEXT, editContextVersion: version },
+        artifacts: { "screen-main": "export default function mount() {}" },
+      }),
+      (err: unknown) =>
+        err instanceof EditContextVersionError &&
+        err.received === version &&
+        err.supported.includes("0.2"),
+      `version ${JSON.stringify(version)} should be refused`,
+    );
+    assert.equal(scripted.requests.length, 0, "no model call for a refused context");
+  }
+});
+
+test("a patch-level edit context version is accepted (only major.minor is the contract)", async () => {
+  const scripted = scriptedProvider([VALID_PAYLOAD]);
+  const harness = createAgentHarness({ provider: scripted.provider, clock: FIXED_CLOCK });
+  const result = await harness.propose({
+    intent: "make it bigger",
+    editContext: { ...EDIT_CONTEXT, editContextVersion: "0.2.1" },
+    artifacts: { "screen-main": "export default function mount() {}" },
+  });
+  assert.ok(result.proposal);
+  assert.deepEqual([...SUPPORTED_EDIT_CONTEXT_VERSIONS], ["0.2"]);
+});
+
+test("a session refuses an unsupported edit context without adopting it", async () => {
+  const scripted = scriptedProvider([VALID_PAYLOAD, VALID_PAYLOAD]);
+  const session = createProposalSession({ provider: scripted.provider, clock: FIXED_CLOCK });
+  await session.propose({
+    intent: "make it bigger",
+    editContext: EDIT_CONTEXT,
+    artifacts: { "screen-main": "export default function mount() {}" },
+  });
+  await assert.rejects(
+    session.refine("again", { editContext: { ...EDIT_CONTEXT, editContextVersion: "0.1" } }),
+    (err: unknown) => err instanceof EditContextVersionError,
+  );
+  // The refused context was not kept: the next turn still runs on the old one.
+  const requestsBefore = scripted.requests.length;
+  const next = await session.refine("once more");
+  assert.ok(scripted.requests.length > requestsBefore);
+  assert.notEqual(next.outcome.status, undefined);
 });

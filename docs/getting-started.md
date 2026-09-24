@@ -129,7 +129,10 @@ only because it answers without reading instructions.
 `propose` takes the user's intent, the current artifacts (base state for
 UI patches), and optionally the [edit
 context](https://github.com/iyulab/vivarium/blob/main/docs/edit-context.md)
-of what the user selected on screen:
+of what the user selected on screen. The harness reads edit context **0.2** and refuses any other
+major.minor before calling the model, with an `EditContextVersionError`
+(`received`, `supported`) — a context of another shape is never read as if
+it were this one:
 
 ```ts
 import type { EditContextInput } from "@vivariumjs/agent";

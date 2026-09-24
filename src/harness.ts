@@ -13,6 +13,7 @@
  * 5. The model is replaceable — providers are injected ports.
  */
 
+import { assertSupportedEditContext } from "./edit-context.ts";
 import type {
   ModelProvider,
   KnowledgeSource,
@@ -128,6 +129,7 @@ export function createAgentHarness(options: AgentHarnessOptions): AgentHarness {
 
     async propose(request: ProposeRequest): Promise<ProposeResult> {
       const editContext = request.editContext ?? null;
+      assertSupportedEditContext(editContext);
       const retrieved: RetrievedKnowledge[] = [];
       for (const source of knowledge) {
         retrieved.push({

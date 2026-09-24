@@ -26,6 +26,7 @@ import { randomUUID } from "node:crypto";
 import { verifyAgainstBase } from "@vivariumjs/changeset";
 import type { VerifiedDiffUiPatch } from "@vivariumjs/changeset";
 import { createAgentHarness } from "./harness.ts";
+import { assertSupportedEditContext } from "./edit-context.ts";
 import type { AgentHarnessOptions, ProposeRequest, ProposeResult } from "./harness.ts";
 import type { EditContextInput, SchemaInput, DataInput } from "./ports.ts";
 import type { PriorProposalContext } from "./strategy.ts";
@@ -231,6 +232,7 @@ export function createProposalSession(options: ProposalSessionOptions): Proposal
           "propose() starts a session and can run only once — use refine() for subsequent turns",
         );
       }
+      assertSupportedEditContext(request.editContext);
       artifacts = { ...(request.artifacts ?? {}) };
       baseArtifacts = { ...(request.baseArtifacts ?? request.artifacts ?? {}) };
       editContext = request.editContext ?? null;
@@ -248,6 +250,7 @@ export function createProposalSession(options: ProposalSessionOptions): Proposal
         );
       }
       if (overrides && "editContext" in overrides) {
+        assertSupportedEditContext(overrides.editContext);
         editContext = overrides.editContext ?? null;
       }
       if (overrides?.baseArtifacts) {

@@ -29,6 +29,7 @@ export type {
   PriorProposalContext,
 } from "./strategy.ts";
 
+export { EditContextVersionError, SUPPORTED_EDIT_CONTEXT_VERSIONS } from "./edit-context.ts";
 export { createProposalSession, SessionCallOrderError } from "./session.ts";
 export type {
   ProposalSession,
