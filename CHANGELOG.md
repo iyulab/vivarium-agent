@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) ·
 versioning: 0.x — minor for surface changes, patch for fixes. The agent
 consumes the changeset contract; it never applies changesets itself.
 
+## 0.4.0 — 2026-09-24
+
+### Added
+- `EditContextVersionError` (`received`, `supported`) and
+  `SUPPORTED_EDIT_CONTEXT_VERSIONS` (`["0.2"]`).
+
+### Changed
+- Depends on `@vivariumjs/changeset` ^0.6.0 (spec 0.5.0). The agent never writes an
+  `attestation`, so its documents are unaffected by that release's tightening.
+- **Breaking — an edit context of an unsupported version is refused.** `propose()`,
+  and a session's `propose()`/`refine()`, throw `EditContextVersionError` before any
+  model call when `editContextVersion` is not 0.2 (patch levels such as 0.2.1 pass).
+  The edit context contract asks consumers to refuse a major/minor they do not read,
+  and 0.2 is not additive over 0.1; before, a context of any version was read as 0.2.
+  A refused `refine()` override is not adopted — the session keeps its previous
+  context. Migration: produce the context with a runtime that emits 0.2
+  (`@vivariumjs/runtime` 0.4.0 or later).
+
 ## 0.3.1 — 2026-09-23
 
 ### Changed
